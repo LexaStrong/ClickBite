@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "292121953384",
+    "firebase_url": "https://clickbitedelivery-default-rtdb.firebaseio.com",
+    "project_id": "clickbitedelivery",
+    "storage_bucket": "clickbitedelivery.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:292121953384:android:72c639628293aedc6b67dd",
+        "android_client_info": {
+          "package_name": "com.lextech.clickbite"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCm-fgcI28rD7iRXtQTKgP0TO37np1WcwI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

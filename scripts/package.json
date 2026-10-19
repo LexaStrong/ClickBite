@@ -1,0 +1,9 @@
+{
+  "name": "clickbite-firebase-admin-tools",
+  "version": "1.0.0",
+  "description": "ClickBite Firebase Admin Database Management Scripts",
+  "main": "seed_firestore.js",
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}

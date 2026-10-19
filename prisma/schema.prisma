@@ -1,0 +1,215 @@
+// Prisma Schema for ClickBites Delivery Platform
+// Database: PostgreSQL (hosted on Supabase) with Row-Level Security (RLS)
+// Offline Sync & Local Cache: Prisma-compatible schema synced bidirectionally
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  CUSTOMER
+  VENDOR
+  RIDER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  PREPARING
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+}
+
+enum SyncOperation {
+  INSERT
+  UPDATE
+  DELETE
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  passwordHash String
+  fullName     String
+  phone        String        @unique
+  role         Role          @default(CUSTOMER)
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  // Relationships
+  vendorProfile VendorProfile?
+  customerOrders Order[]      @relation("CustomerOrders")
+  auditLogs     SecurityAuditLog[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([role])
+}
+
+model VendorProfile {
+  id             String     @id @default(uuid())
+  userId         String     @unique
+  restaurantName String
+  cuisine        String
+  address        String
+  bannerAsset    String
+  phone          String
+  momoNumber     String
+  isOpen         Boolean    @default(true)
+  isApproved     Boolean    @default(true)
+  rating         Float      @default(4.8)
+  reviewCount    Int        @default(0)
+  deliveryTime   String     @default("15-25 min")
+  deliveryFee    Float      @default(5.00)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  // Relationships
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dishes         FoodItem[]
+  orders         Order[]    @relation("VendorOrders")
+
+  @@index([userId])
+  @@index([isApproved, isOpen])
+}
+
+model FoodItem {
+  id              String      @id @default(uuid())
+  vendorId        String
+  name            String
+  description     String
+  price           Float
+  imageAsset      String
+  categoryId      String
+  rating          Float       @default(4.8)
+  prepTimeMinutes Int         @default(20)
+  badgeText       String?
+  isAvailable     Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relationships
+  vendor          VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  addons          Addon[]
+  orderItems      OrderItem[]
+
+  @@index([vendorId])
+  @@index([categoryId, isAvailable])
+}
+
+model Addon {
+  id          String   @id @default(uuid())
+  foodItemId  String?
+  name        String
+  price       Float
+  category    String   @default("side") // protein, side, sauce
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  // Relationships
+  foodItem    FoodItem? @relation(fields: [foodItemId], references: [id], onDelete: Cascade)
+
+  @@index([foodItemId])
+}
+
+model Order {
+  id               String        @id @default(uuid())
+  customerId       String
+  vendorId         String
+  subtotal         Float
+  deliveryFee      Float         @default(10.00)
+  totalAmount      Float
+  status           OrderStatus   @default(PENDING)
+  paymentMethod    String        // MTN Mobile Money, Telecel Cash, COD
+  paymentStatus    PaymentStatus @default(PENDING)
+  momoReference    String?
+  deliveryAddress  String
+  deliveryLandmark String?
+  customerPhone    String
+  notes            String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  // Relationships
+  customer         User          @relation("CustomerOrders", fields: [customerId], references: [id])
+  vendor           VendorProfile @relation("VendorOrders", fields: [vendorId], references: [id])
+  items            OrderItem[]
+
+  @@index([customerId])
+  @@index([vendorId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id                 String   @id @default(uuid())
+  orderId            String
+  foodItemId         String
+  quantity           Int      @default(1)
+  unitPrice          Float
+  totalPrice         Float
+  spiceLevel         String?
+  selectedAddonsJson String?  // JSON serialized list of DishAddon
+  notes              String?
+
+  // Relationships
+  order              Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  foodItem           FoodItem @relation(fields: [foodItemId], references: [id])
+
+  @@index([orderId])
+}
+
+model SyncQueue {
+  id              String        @id @default(uuid())
+  operation       SyncOperation
+  entityTable     String
+  entityId        String
+  payloadJson     String
+  clientTimestamp DateTime      @default(now())
+  status          SyncStatus    @default(PENDING)
+  retryCount      Int           @default(0)
+  lastError       String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([status, retryCount])
+  @@index([clientTimestamp])
+}
+
+model SecurityAuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String   // LOGIN_ATTEMPT, SIGN_UP, PASSWORD_CHANGE, VENDOR_ACCESS_CHECK
+  status    String   // SUCCESS, FAILED, BLOCKED
+  ipAddress String?
+  details   String?
+  timestamp DateTime @default(now())
+
+  // Relationships
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, timestamp])
+  @@index([action, status])
+}
