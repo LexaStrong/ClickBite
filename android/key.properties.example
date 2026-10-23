@@ -1,0 +1,8 @@
+# ClickBite Android Release Signing Keystore Configuration
+# Copy this file to android/key.properties and fill in your production credentials
+# NOTE: Never commit android/key.properties or *.jks files to version control!
+
+keyAlias=clickbite-upload
+keyPassword=YourKeyPasswordHere
+storeFile=app/upload-keystore.jks
+storePassword=YourStorePasswordHere

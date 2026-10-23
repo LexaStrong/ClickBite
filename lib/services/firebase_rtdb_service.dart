@@ -38,17 +38,34 @@ class FirebaseRtdbService {
     String? riderName,
     String? riderPhone,
   }) async {
-    final locationData = {
+    final Map<String, dynamic> locationData = {
       'latitude': latitude,
       'longitude': longitude,
       'heading': heading ?? 0.0,
       'speedKmh': speedKmh ?? 25.0,
-      if (riderName != null) 'riderName': riderName,
-      if (riderPhone != null) 'riderPhone': riderPhone,
       'updatedAt': ServerValue.timestamp,
     };
+    if (riderName != null) locationData['riderName'] = riderName;
+    if (riderPhone != null) locationData['riderPhone'] = riderPhone;
 
     await _ordersRef.child('$orderId/courier_location').set(locationData);
+  }
+
+  /// Broadcast global rider coordinates to the couriers registry
+  Future<void> updateRiderPosition({
+    required String courierId,
+    required double latitude,
+    required double longitude,
+    double? speedKmh,
+    bool isAvailable = true,
+  }) async {
+    await _couriersRef.child(courierId).set({
+      'latitude': latitude,
+      'longitude': longitude,
+      'speedKmh': speedKmh ?? 20.0,
+      'isAvailable': isAvailable,
+      'updatedAt': ServerValue.timestamp,
+    });
   }
 
   /// Broadcast order delivery event (e.g. "PICKED_UP", "APPROACHING", "ARRIVED")

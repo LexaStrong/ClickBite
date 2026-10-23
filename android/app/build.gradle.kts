@@ -43,11 +43,17 @@ android {
 
     signingConfigs {
         if (hasReleaseKeystore) {
-            create("release") {
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
-                storeFile = file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
+            val alias = keystoreProperties.getProperty("keyAlias") ?: keystoreProperties.getProperty("\uFEFFkeyAlias")
+            val keyPass = keystoreProperties.getProperty("keyPassword")
+            val storePass = keystoreProperties.getProperty("storePassword")
+            val storeFilePath = keystoreProperties.getProperty("storeFile")
+            if (alias != null && keyPass != null && storePass != null && storeFilePath != null) {
+                create("release") {
+                    keyAlias = alias
+                    keyPassword = keyPass
+                    storeFile = file(storeFilePath)
+                    storePassword = storePass
+                }
             }
         }
     }
@@ -56,7 +62,8 @@ android {
         release {
             // Uses the upload keystore when android/key.properties exists;
             // otherwise falls back to debug keys so local release builds still work.
-            signingConfig = if (hasReleaseKeystore) {
+            val hasRelease = hasReleaseKeystore && signingConfigs.findByName("release") != null
+            signingConfig = if (hasRelease) {
                 signingConfigs.getByName("release")
             } else {
                 signingConfigs.getByName("debug")

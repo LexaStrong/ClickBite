@@ -5,6 +5,8 @@ import '../state/cart_state.dart';
 import '../widgets/bouncy_tap.dart';
 import '../services/firebase_firestore_service.dart';
 import '../services/security_service.dart';
+import '../services/paystack_service.dart';
+import '../services/notification_service.dart';
 
 /// Full Cart & Checkout Screen with swipe-to-delete dismissible items,
 /// Konongo address selector, mobile money payment options, and animated order placement.
@@ -25,15 +27,21 @@ class CartScreen extends StatefulWidget {
 class _CartScreenState extends State<CartScreen> {
   final CartState _cart = CartState();
   bool _isSubmitting = false;
+  late final TextEditingController _momoPhoneController;
 
   @override
   void initState() {
     super.initState();
+    final session = SecurityService().currentSession;
+    _momoPhoneController = TextEditingController(
+      text: session?.phone.isNotEmpty == true ? session!.phone : '024 882 1093',
+    );
     _cart.addListener(_onCartChanged);
   }
 
   @override
   void dispose() {
+    _momoPhoneController.dispose();
     _cart.removeListener(_onCartChanged);
     super.dispose();
   }
@@ -50,7 +58,12 @@ class _CartScreenState extends State<CartScreen> {
     final customerId =
         session?.userId ?? 'cust_${DateTime.now().millisecondsSinceEpoch}';
     final customerName = session?.fullName ?? 'ClickBite Customer';
-    final customerPhone = session?.phone ?? '0241234567';
+    final customerPhone = _momoPhoneController.text.trim().isNotEmpty
+        ? _momoPhoneController.text.trim()
+        : (session?.phone ?? '0241234567');
+    final customerEmail = session?.email ?? 'customer@clickbites.gh';
+
+    String orderId = 'ord_${DateTime.now().millisecondsSinceEpoch}';
 
     try {
       final itemsList = _cart.items
@@ -65,7 +78,7 @@ class _CartScreenState extends State<CartScreen> {
               })
           .toList();
 
-      final orderId = await FirebaseFirestoreService().submitOrder(
+      orderId = await FirebaseFirestoreService().submitOrder(
         customerId: customerId,
         customerName: customerName,
         customerPhone: customerPhone,
@@ -81,13 +94,204 @@ class _CartScreenState extends State<CartScreen> {
       _cart.setActiveOrderId(orderId);
     } catch (e) {
       debugPrint('[CartScreen] Order queued locally or offline: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
     }
 
-    _showOrderSuccessDialog();
+    final isMoMo = _cart.paymentMethod.contains('Money') ||
+        _cart.paymentMethod.contains('Cash') &&
+            !_cart.paymentMethod.contains('on Delivery');
+
+    if (isMoMo) {
+      final provider = _cart.paymentMethod.contains('Telecel')
+          ? MomoProvider.telecel
+          : MomoProvider.mtn;
+
+      final chargeResult = await PaystackService().initiateMomoCharge(
+        email: customerEmail,
+        amountGhs: _cart.total,
+        phone: customerPhone,
+        provider: provider,
+        orderId: orderId,
+      );
+
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        _showMomoAuthorizationModal(
+          orderId: orderId,
+          result: chargeResult,
+          provider: provider,
+          phone: customerPhone,
+        );
+      }
+    } else {
+      // Cash on Delivery
+      NotificationService().postOrderNotification(
+        orderId: orderId,
+        type: NotificationType.orderPlaced,
+      );
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        _showOrderSuccessDialog();
+      }
+    }
+  }
+
+  void _showMomoAuthorizationModal({
+    required String orderId,
+    required PaystackChargeResult result,
+    required MomoProvider provider,
+    required String phone,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final isMtn = provider == MomoProvider.mtn;
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isMtn
+                      ? const Color(0xFFFFCC00)
+                      : const Color(0xFFE60000),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                ),
+                child: Text(
+                  isMtn ? 'MTN MoMo USSD Prompt' : 'Telecel Cash Prompt',
+                  style: TextStyle(
+                    color: isMtn ? Colors.black : Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Authorize Payment',
+                style: GoogleFonts.playfairDisplay(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'A prompt of GH₵${_cart.total.toStringAsFixed(2)} has been sent to $phone.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primarySubtle,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline_rounded,
+                        color: AppColors.primary, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        result.displayText ?? provider.ussdPromptInstruction,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primaryDark,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Reference: ${result.reference}',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: BouncyTap(
+                  onTap: () async {
+                    Navigator.pop(context);
+                    // Verify and update order state to PREPARING
+                    await FirebaseFirestoreService().updateOrderStatus(
+                      orderId: orderId,
+                      status: 'PREPARING',
+                    );
+                    NotificationService().postOrderNotification(
+                      orderId: orderId,
+                      type: NotificationType.kitchenPreparing,
+                    );
+                    _showOrderSuccessDialog();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(AppRadius.full),
+                      boxShadow: AppShadows.buttonElevated,
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'I Have Approved Prompt →',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  'Cancel Payment',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _showOrderSuccessDialog() {
@@ -416,6 +620,75 @@ class _CartScreenState extends State<CartScreen> {
                   _buildPaymentOption('MTN Mobile Money', Icons.phone_android_rounded),
                   _buildPaymentOption('Telecel Cash', Icons.account_balance_wallet_rounded),
                   _buildPaymentOption('Cash on Delivery', Icons.payments_rounded),
+                  if (_cart.paymentMethod != 'Cash on Delivery') ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: _cart.paymentMethod.contains('MTN')
+                                      ? const Color(0xFFFFCC00)
+                                      : const Color(0xFFE60000),
+                                  borderRadius: BorderRadius.circular(AppRadius.xs),
+                                ),
+                                child: Text(
+                                  _cart.paymentMethod.contains('MTN') ? 'MTN MoMo' : 'Telecel',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 10,
+                                    color: _cart.paymentMethod.contains('MTN') ? Colors.black : Colors.white,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Mobile Money Number for Prompt',
+                                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _momoPhoneController,
+                            keyboardType: TextInputType.phone,
+                            decoration: InputDecoration(
+                              hintText: 'e.g. 024 123 4567',
+                              prefixIcon: const Icon(Icons.phone_iphone_rounded, size: 18, color: AppColors.primary),
+                              filled: true,
+                              fillColor: AppColors.surface,
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(AppRadius.sm),
+                                borderSide: const BorderSide(color: AppColors.border),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(AppRadius.sm),
+                                borderSide: const BorderSide(color: AppColors.border),
+                              ),
+                            ),
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Paystack triggers an instant USSD popup on this phone.',
+                            style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

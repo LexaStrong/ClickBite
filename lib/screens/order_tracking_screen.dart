@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../state/cart_state.dart';
 import '../services/location_service.dart';
 import '../services/firebase_firestore_service.dart';
+import '../services/notification_service.dart';
 import '../widgets/live_map_tracker.dart';
 import '../widgets/bouncy_tap.dart';
 
@@ -29,15 +31,50 @@ class OrderTrackingScreen extends StatefulWidget {
 class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   final LocationService _locationService = LocationService();
   final CartState _cartState = CartState();
+  StreamSubscription<ClickBiteNotification>? _notifSub;
 
   @override
   void initState() {
     super.initState();
     _locationService.addListener(_onLocationChanged);
+    _notifSub = NotificationService().onNotificationReceived.listen((notif) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.notifications_active_rounded,
+                    color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(notif.title,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800, fontSize: 12.5)),
+                      Text(notif.body,
+                          style: const TextStyle(fontSize: 11),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: AppColors.primary,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    });
   }
 
   @override
   void dispose() {
+    _notifSub?.cancel();
     _locationService.removeListener(_onLocationChanged);
     super.dispose();
   }
