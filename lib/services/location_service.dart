@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'cache_service.dart';
 
 /// Konongo Landmark Location Model
 class KonongoLocation {
@@ -25,7 +26,16 @@ class LocationService extends ChangeNotifier {
   static final LocationService _instance = LocationService._internal();
   factory LocationService() => _instance;
 
-  LocationService._internal();
+  LocationService._internal() {
+    _loadCachedLocation();
+  }
+
+  void _loadCachedLocation() {
+    final cached = CacheService().getCachedLocation();
+    if (cached != null) {
+      _currentLocation = cached;
+    }
+  }
 
   static const List<KonongoLocation> konongoLandmarks = [
     KonongoLocation(
@@ -87,6 +97,7 @@ class LocationService extends ChangeNotifier {
   /// Select a landmark location
   void setLocation(KonongoLocation location) {
     _currentLocation = location;
+    CacheService().cacheLocation(location);
     notifyListeners();
   }
 
@@ -100,6 +111,7 @@ class LocationService extends ChangeNotifier {
 
     // Choose the closest GPS fix
     _currentLocation = konongoLandmarks[0];
+    CacheService().cacheLocation(_currentLocation);
     _isLocating = false;
     notifyListeners();
   }

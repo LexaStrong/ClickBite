@@ -54,3 +54,6 @@ serviceAccountKey.json
 key.properties
 *.jks
 
+
+# Secrets
+.env

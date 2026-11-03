@@ -7,6 +7,8 @@ import '../services/firebase_firestore_service.dart';
 import '../services/security_service.dart';
 import '../services/paystack_service.dart';
 import '../services/notification_service.dart';
+import '../services/cache_service.dart';
+import '../utils/ghana_phone.dart';
 
 /// Full Cart & Checkout Screen with swipe-to-delete dismissible items,
 /// Konongo address selector, mobile money payment options, and animated order placement.
@@ -28,6 +30,9 @@ class _CartScreenState extends State<CartScreen> {
   final CartState _cart = CartState();
   bool _isSubmitting = false;
   late final TextEditingController _momoPhoneController;
+  late final TextEditingController _recipientNameController;
+  late final TextEditingController _recipientPhoneController;
+  late final TextEditingController _recipientNoteController;
 
   @override
   void initState() {
@@ -36,12 +41,33 @@ class _CartScreenState extends State<CartScreen> {
     _momoPhoneController = TextEditingController(
       text: session?.phone.isNotEmpty == true ? session!.phone : '024 882 1093',
     );
+
+    final lastRecipient = CacheService().getLastRecipient();
+    _recipientNameController = TextEditingController(
+      text: _cart.recipientName.isNotEmpty
+          ? _cart.recipientName
+          : (lastRecipient?['name'] ?? ''),
+    );
+    _recipientPhoneController = TextEditingController(
+      text: _cart.recipientPhone.isNotEmpty
+          ? _cart.recipientPhone
+          : (lastRecipient?['phone'] ?? ''),
+    );
+    _recipientNoteController = TextEditingController(
+      text: _cart.recipientNote.isNotEmpty
+          ? _cart.recipientNote
+          : (lastRecipient?['note'] ?? ''),
+    );
+
     _cart.addListener(_onCartChanged);
   }
 
   @override
   void dispose() {
     _momoPhoneController.dispose();
+    _recipientNameController.dispose();
+    _recipientPhoneController.dispose();
+    _recipientNoteController.dispose();
     _cart.removeListener(_onCartChanged);
     super.dispose();
   }
@@ -52,6 +78,54 @@ class _CartScreenState extends State<CartScreen> {
 
   Future<void> _handlePlaceOrder() async {
     if (_isSubmitting) return;
+
+    // Validate Order for Someone Else if checked
+    if (_cart.isForSomeoneElse) {
+      final recName = _recipientNameController.text.trim();
+      final recPhone = _recipientPhoneController.text.trim();
+
+      if (recName.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Please enter recipient name for this order.',
+              style: GoogleFonts.plusJakartaSans(),
+            ),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
+      if (!GhanaPhone.isValid(recPhone)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Please enter a valid Ghanaian number for recipient (e.g. 024 XXX XXXX)',
+              style: GoogleFonts.plusJakartaSans(),
+            ),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
+      _cart.setRecipientDetails(
+        name: recName,
+        phone: recPhone,
+        note: _recipientNoteController.text.trim(),
+      );
+
+      // Cache for next time
+      CacheService().cacheLastRecipient(
+        name: recName,
+        phone: recPhone,
+        note: _recipientNoteController.text.trim(),
+      );
+    }
+
     setState(() => _isSubmitting = true);
 
     final session = SecurityService().currentSession;
@@ -89,6 +163,10 @@ class _CartScreenState extends State<CartScreen> {
         deliveryFee: _cart.deliveryFee,
         deliveryAddress: _cart.selectedAddress,
         paymentMethod: _cart.paymentMethod,
+        isForSomeoneElse: _cart.isForSomeoneElse,
+        recipientName: _cart.recipientName,
+        recipientPhone: _cart.recipientPhone,
+        recipientNote: _cart.recipientNote,
       );
 
       _cart.setActiveOrderId(orderId);
@@ -591,6 +669,16 @@ class _CartScreenState extends State<CartScreen> {
 
         const SliverToBoxAdapter(child: SizedBox(height: 14)),
 
+        // Order for Someone Else Card
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.base),
+            child: _buildOrderForSomeoneCard(context),
+          ),
+        ),
+
+        const SliverToBoxAdapter(child: SizedBox(height: 14)),
+
         // Payment Method Card
         SliverToBoxAdapter(
           child: Padding(
@@ -842,7 +930,10 @@ class _CartScreenState extends State<CartScreen> {
                 if (item.selectedAddons.isNotEmpty) ...[
                   const SizedBox(height: 3),
                   Text(
-                    item.selectedAddons.map((a) => '+ ${a.name} (+GH₵${a.price.toStringAsFixed(0)})').join(', '),
+                    item.selectedAddons
+                        .map((a) =>
+                            '+ ${a.quantity > 1 ? '${a.quantity}x ' : ''}${a.name} (+GH₵${(a.price * a.quantity).toStringAsFixed(0)})')
+                        .join(', '),
                     style: const TextStyle(
                       fontSize: 10.5,
                       color: AppColors.textSecondary,
@@ -948,6 +1039,295 @@ class _CartScreenState extends State<CartScreen> {
         Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
         Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
       ],
+    );
+  }
+
+  Widget _buildOrderForSomeoneCard(BuildContext context) {
+    final isForSomeone = _cart.isForSomeoneElse;
+    final detectedNet = GhanaPhone.networkOf(_recipientPhoneController.text);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        boxShadow: AppShadows.soft,
+        border: Border.all(
+          color: isForSomeone ? AppColors.primary : AppColors.border,
+          width: isForSomeone ? 1.5 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: isForSomeone
+                      ? AppColors.primary
+                      : AppColors.primarySubtle,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.card_giftcard_rounded,
+                  color: isForSomeone ? Colors.white : AppColors.primary,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Order for Someone Else',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Send food as a gift or surprise treat',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: isForSomeone,
+                activeTrackColor: AppColors.primary,
+                onChanged: (val) {
+                  _cart.setForSomeoneElse(val);
+                },
+              ),
+            ],
+          ),
+
+          if (isForSomeone) ...[
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+
+            // Recipient Full Name
+            Text(
+              'Recipient Full Name',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextFormField(
+              controller: _recipientNameController,
+              style: GoogleFonts.plusJakartaSans(fontSize: 13.5),
+              decoration: InputDecoration(
+                hintText: 'e.g. Ama Serwaa or Uncle Kojo',
+                hintStyle: GoogleFonts.plusJakartaSans(
+                  fontSize: 12.5,
+                  color: AppColors.textTertiary,
+                ),
+                prefixIcon: const Icon(
+                  Icons.person_outline_rounded,
+                  size: 18,
+                  color: AppColors.primary,
+                ),
+                filled: true,
+                fillColor: AppColors.background,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  borderSide: const BorderSide(
+                    color: AppColors.primary,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Recipient Phone Number
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Recipient Ghana Mobile Number',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                if (detectedNet.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: detectedNet == 'MTN'
+                          ? const Color(0xFFFFCC00)
+                          : detectedNet == 'Telecel'
+                              ? const Color(0xFFE60000)
+                              : AppColors.primary,
+                      borderRadius: BorderRadius.circular(AppRadius.xs),
+                    ),
+                    child: Text(
+                      detectedNet,
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        color: detectedNet == 'MTN'
+                            ? Colors.black
+                            : Colors.white,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            TextFormField(
+              controller: _recipientPhoneController,
+              keyboardType: TextInputType.phone,
+              onChanged: (_) => setState(() {}),
+              style: GoogleFonts.plusJakartaSans(fontSize: 13.5),
+              decoration: InputDecoration(
+                hintText: '024 XXX XXXX or +233 ...',
+                hintStyle: GoogleFonts.plusJakartaSans(
+                  fontSize: 12.5,
+                  color: AppColors.textTertiary,
+                ),
+                prefixIcon: const Icon(
+                  Icons.phone_outlined,
+                  size: 18,
+                  color: AppColors.primary,
+                ),
+                filled: true,
+                fillColor: AppColors.background,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  borderSide: const BorderSide(
+                    color: AppColors.primary,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Recipient Note / Surprise message
+            Text(
+              'Rider Delivery Note & Surprise Instructions',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextFormField(
+              controller: _recipientNoteController,
+              style: GoogleFonts.plusJakartaSans(fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'e.g. Call when outside the gate, surprise lunch!',
+                hintStyle: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  color: AppColors.textTertiary,
+                ),
+                prefixIcon: const Icon(
+                  Icons.note_alt_outlined,
+                  size: 18,
+                  color: AppColors.primary,
+                ),
+                filled: true,
+                fillColor: AppColors.background,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  borderSide: const BorderSide(
+                    color: AppColors.primary,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            // Info banner
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.primarySubtle,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.delivery_dining_rounded,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Our courier will call the recipient upon arrival and deliver the hot meal in your name.',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

@@ -339,12 +339,146 @@ class VendorState extends ChangeNotifier {
       const VendorAddonOption(id: 'add-6', name: 'Soft Stewed Wele', price: 5.00, isDefaultSelected: true),
       const VendorAddonOption(id: 'add-7', name: 'Seasoned Gari Fortor', price: 3.00, isDefaultSelected: false),
       const VendorAddonOption(id: 'add-8', name: 'Spaghetti / Macaroni Slaw', price: 4.00, isDefaultSelected: false),
+      const VendorAddonOption(id: 'add-9', name: 'Chilled Soft Drinks (Coke / Fanta / Sprite)', price: 8.00, isDefaultSelected: true),
+      const VendorAddonOption(id: 'add-10', name: 'Bottled Mineral Water (500ml Chilled)', price: 3.00, isDefaultSelected: true),
     ];
   }
 
   // Actions
   void toggleStoreOpen() {
     _profile = _profile.copyWith(isOpen: !_profile.isOpen);
+    notifyListeners();
+  }
+
+  void updateDishPrice(String dishId, double newPrice) {
+    final idx = _vendorDishes.indexWhere((d) => d.id == dishId);
+    if (idx != -1) {
+      _vendorDishes[idx] = _vendorDishes[idx].copyWith(price: newPrice);
+      final sampleIdx = sampleFoodItems.indexWhere((d) => d.id == dishId);
+      if (sampleIdx != -1) {
+        sampleFoodItems[sampleIdx] = sampleFoodItems[sampleIdx].copyWith(price: newPrice);
+      }
+      notifyListeners();
+    }
+  }
+
+  void toggleDishAvailability(String dishId) {
+    final idx = _vendorDishes.indexWhere((d) => d.id == dishId);
+    if (idx != -1) {
+      final current = _vendorDishes[idx];
+      _vendorDishes[idx] = current.copyWith(isAvailable: !current.isAvailable);
+      final sampleIdx = sampleFoodItems.indexWhere((d) => d.id == dishId);
+      if (sampleIdx != -1) {
+        sampleFoodItems[sampleIdx] = sampleFoodItems[sampleIdx].copyWith(isAvailable: !current.isAvailable);
+      }
+      notifyListeners();
+    }
+  }
+
+  void updateDish(FoodItem updatedDish) {
+    final idx = _vendorDishes.indexWhere((d) => d.id == updatedDish.id);
+    if (idx != -1) {
+      _vendorDishes[idx] = updatedDish;
+    } else {
+      _vendorDishes.add(updatedDish);
+    }
+    final sampleIdx = sampleFoodItems.indexWhere((d) => d.id == updatedDish.id);
+    if (sampleIdx != -1) {
+      sampleFoodItems[sampleIdx] = updatedDish;
+    } else {
+      sampleFoodItems.insert(0, updatedDish);
+    }
+    notifyListeners();
+  }
+
+  void removeDish(String dishId) {
+    _vendorDishes.removeWhere((d) => d.id == dishId);
+    sampleFoodItems.removeWhere((d) => d.id == dishId);
+    notifyListeners();
+  }
+
+  void onboardNewKitchen({
+    required String restaurantName,
+    required String ownerName,
+    required String phone,
+    required String momoNumber,
+    required String address,
+    required String cuisineSummary,
+    String? bannerAsset,
+    List<CuratedFoodGalleryItem>? selectedDishes,
+    List<CustomizedVendorDish>? customizedDishes,
+    required List<VendorAddonOption> selectedAddons,
+  }) {
+    final chosenBanner = (bannerAsset != null && bannerAsset.isNotEmpty)
+        ? bannerAsset
+        : (customizedDishes != null && customizedDishes.isNotEmpty
+            ? customizedDishes.first.imageAsset
+            : (selectedDishes != null && selectedDishes.isNotEmpty
+                ? selectedDishes.first.imageAsset
+                : 'assets/images/jollof_rice.png'));
+
+    _profile = VendorProfile(
+      id: 'vendor-${DateTime.now().millisecondsSinceEpoch}',
+      restaurantName: restaurantName,
+      ownerName: ownerName,
+      phone: phone,
+      momoNumber: momoNumber,
+      address: address,
+      cuisineSummary: cuisineSummary,
+      bannerAsset: chosenBanner,
+      isOpen: true,
+      rating: 5.0,
+      totalOrders: 0,
+      balanceAvailable: 0.0,
+      pendingSettlement: 0.0,
+      totalEarnings: 0.0,
+    );
+
+    // Populate vendor dishes from customized dishes or gallery selections
+    if (customizedDishes != null && customizedDishes.isNotEmpty) {
+      _vendorDishes = customizedDishes.map((c) => c.toFoodItem()).toList();
+    } else if (selectedDishes != null && selectedDishes.isNotEmpty) {
+      _vendorDishes = selectedDishes.map((g) {
+        return FoodItem(
+          id: 'custom-${g.id}',
+          name: g.title,
+          description: g.description,
+          price: g.defaultPrice,
+          imageAsset: g.imageAsset,
+          categoryId: 'jollof',
+          rating: 5.0,
+          prepTimeMinutes: 20,
+          badgeText: 'KITCHEN FRESH',
+        );
+      }).toList();
+    }
+
+    // Register into the active sampleRestaurants directory
+    final newRest = Restaurant(
+      id: _profile.id,
+      name: restaurantName,
+      cuisine: cuisineSummary.isNotEmpty ? cuisineSummary : 'Authentic Konongo Delicacies',
+      address: address,
+      rating: 5.0,
+      reviewCount: 1,
+      deliveryTime: '15-25 min',
+      deliveryFee: 5.00,
+      imageAsset: chosenBanner,
+      badgeText: 'NEW KITCHEN',
+      isOpen: true,
+      distanceKm: '0.5',
+      featuredDishIds: _vendorDishes.map((d) => d.id).toList(),
+    );
+
+    sampleRestaurants.removeWhere((r) => r.id == _profile.id || r.name == restaurantName);
+    sampleRestaurants.insert(0, newRest);
+
+    // Prepend newly customized dishes to sampleFoodItems
+    for (final dish in _vendorDishes) {
+      sampleFoodItems.removeWhere((f) => f.id == dish.id);
+      sampleFoodItems.insert(0, dish);
+    }
+
     notifyListeners();
   }
 
@@ -446,75 +580,5 @@ class VendorState extends ChangeNotifier {
       distanceKm: '0.6',
       featuredDishIds: _vendorDishes.map((d) => d.id).toList(),
     );
-  }
-
-  void onboardNewKitchen({
-    required String restaurantName,
-    required String ownerName,
-    required String phone,
-    required String momoNumber,
-    required String address,
-    required String cuisineSummary,
-    String? bannerAsset,
-    required List<CuratedFoodGalleryItem> selectedDishes,
-    required List<VendorAddonOption> selectedAddons,
-  }) {
-    final chosenBanner = (bannerAsset != null && bannerAsset.isNotEmpty)
-        ? bannerAsset
-        : (selectedDishes.isNotEmpty ? selectedDishes.first.imageAsset : 'assets/images/jollof_rice.png');
-
-    _profile = VendorProfile(
-      id: 'vendor-${DateTime.now().millisecondsSinceEpoch}',
-      restaurantName: restaurantName,
-      ownerName: ownerName,
-      phone: phone,
-      momoNumber: momoNumber,
-      address: address,
-      cuisineSummary: cuisineSummary,
-      bannerAsset: chosenBanner,
-      isOpen: true,
-      rating: 5.0,
-      totalOrders: 0,
-      balanceAvailable: 0.0,
-      pendingSettlement: 0.0,
-      totalEarnings: 0.0,
-    );
-
-    // Populate vendor dishes from onboarding gallery selections
-    _vendorDishes = selectedDishes.map((g) {
-      return FoodItem(
-        id: 'custom-${g.id}',
-        name: g.title,
-        description: g.description,
-        price: g.defaultPrice,
-        imageAsset: g.imageAsset,
-        categoryId: 'jollof',
-        rating: 5.0,
-        prepTimeMinutes: 20,
-        badgeText: 'KITCHEN FRESH',
-      );
-    }).toList();
-
-    // Register into the active sampleRestaurants directory
-    final newRest = Restaurant(
-      id: _profile.id,
-      name: restaurantName,
-      cuisine: cuisineSummary.isNotEmpty ? cuisineSummary : 'Authentic Konongo Delicacies',
-      address: address,
-      rating: 5.0,
-      reviewCount: 1,
-      deliveryTime: '15-25 min',
-      deliveryFee: 5.00,
-      imageAsset: chosenBanner,
-      badgeText: 'NEW KITCHEN',
-      isOpen: true,
-      distanceKm: '0.5',
-      featuredDishIds: _vendorDishes.map((d) => d.id).toList(),
-    );
-
-    sampleRestaurants.removeWhere((r) => r.id == _profile.id || r.name == restaurantName);
-    sampleRestaurants.insert(0, newRest);
-
-    notifyListeners();
   }
 }

@@ -34,6 +34,8 @@ class FoodItem {
   final int prepTimeMinutes;
   final String? badgeText;
   final List<String> tags;
+  final List<DishAddon> availableAddons;
+  final bool isAvailable;
 
   const FoodItem({
     required this.id,
@@ -46,7 +48,39 @@ class FoodItem {
     this.prepTimeMinutes = 25,
     this.badgeText,
     this.tags = const [],
+    this.availableAddons = const [],
+    this.isAvailable = true,
   });
+
+  FoodItem copyWith({
+    String? id,
+    String? name,
+    String? description,
+    double? price,
+    String? imageAsset,
+    String? categoryId,
+    double? rating,
+    int? prepTimeMinutes,
+    String? badgeText,
+    List<String>? tags,
+    List<DishAddon>? availableAddons,
+    bool? isAvailable,
+  }) {
+    return FoodItem(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      price: price ?? this.price,
+      imageAsset: imageAsset ?? this.imageAsset,
+      categoryId: categoryId ?? this.categoryId,
+      rating: rating ?? this.rating,
+      prepTimeMinutes: prepTimeMinutes ?? this.prepTimeMinutes,
+      badgeText: badgeText ?? this.badgeText,
+      tags: tags ?? this.tags,
+      availableAddons: availableAddons ?? this.availableAddons,
+      isAvailable: isAvailable ?? this.isAvailable,
+    );
+  }
 }
 
 /// Restaurant model for the Konongo restaurants directory
@@ -82,13 +116,14 @@ class Restaurant {
   });
 }
 
-/// Addon option for customizing meals (extra fish, plantains, eggs, wele, shito, etc.)
+/// Addon option for customizing meals (extra fish, plantains, eggs, wele, shito, soft drinks, etc.)
 class DishAddon {
   final String id;
   final String name;
   final double price;
   final String category; // 'protein', 'side', 'sauce', 'snack', 'drink'
   final String? imageAsset;
+  final int quantity;
 
   const DishAddon({
     required this.id,
@@ -96,7 +131,26 @@ class DishAddon {
     required this.price,
     this.category = 'side',
     this.imageAsset,
+    this.quantity = 1,
   });
+
+  DishAddon copyWith({
+    String? id,
+    String? name,
+    double? price,
+    String? category,
+    String? imageAsset,
+    int? quantity,
+  }) {
+    return DishAddon(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      price: price ?? this.price,
+      category: category ?? this.category,
+      imageAsset: imageAsset ?? this.imageAsset,
+      quantity: quantity ?? this.quantity,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -104,6 +158,7 @@ class DishAddon {
     'price': price,
     'category': category,
     'imageAsset': imageAsset,
+    'quantity': quantity,
   };
 
   factory DishAddon.fromJson(Map<String, dynamic> json) => DishAddon(
@@ -112,6 +167,7 @@ class DishAddon {
     price: (json['price'] as num).toDouble(),
     category: json['category'] as String? ?? 'side',
     imageAsset: json['imageAsset'] as String?,
+    quantity: (json['quantity'] as num?)?.toInt() ?? 1,
   );
 
   @override
@@ -126,6 +182,9 @@ class DishAddon {
 /// Standard authentic Ghanaian dish addons available for food customization,
 /// including proteins, sides, sauces, snacks, pastries, wines, and chilled drinks.
 final List<DishAddon> standardGhanaianAddons = [
+  // Beverages, Bottled Water & Soft Drinks
+  const DishAddon(id: 'add-9', name: 'Chilled Soft Drink (Coke / Fanta / Sprite)', price: 8.00, category: 'drink'),
+  const DishAddon(id: 'add-10', name: 'Bottled Mineral Water (500ml Chilled)', price: 3.00, category: 'drink'),
   // Proteins & Traditional Sides
   const DishAddon(id: 'add-fish', name: 'Fried Fish / Tilapia Cut', price: 10.00, category: 'protein', imageAsset: 'assets/images/grilled_tilapia.png'),
   const DishAddon(id: 'add-egg', name: 'Boiled Farm Egg', price: 3.00, category: 'protein'),

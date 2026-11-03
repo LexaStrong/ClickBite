@@ -101,7 +101,7 @@ class TermsOfServiceScreen extends StatelessWidget {
 
             _buildClause(
               '8. Contact for Legal Inquiries',
-              'For questions regarding these terms, contact legal@clickbites.com.gh or visit our local management desk at Asante Akim Central Municipal, Konongo, Ghana.',
+              'For questions regarding these terms, contact help@clickbitegh.com or call +233535548343. You can also visit our local management desk at Asante Akim Central Municipal, Konongo, Ghana.',
             ),
 
             const SizedBox(height: 24),

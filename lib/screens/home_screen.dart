@@ -20,7 +20,7 @@ import '../widgets/food_detail_sheet.dart';
 import 'restaurants_screen.dart';
 import 'restaurant_detail_screen.dart';
 import 'cart_screen.dart';
-import 'order_tracking_screen.dart';
+// import 'order_tracking_screen.dart'; // Reserved for next version
 import 'profile_screen.dart';
 
 /// ClickBites Main App Controller & Shell
@@ -349,8 +349,9 @@ class _HomeScreenState extends State<HomeScreen> {
               // Tab 1: Restaurants Screen (Most restaurants in Konongo)
               RestaurantsScreen(onShowDishDetails: _showFoodDetails),
 
-              // Tab 2: Live Tracking Screen
-              const OrderTrackingScreen(),
+              // Tab 2: Live Tracking Screen (Commented out for the next version)
+              // const OrderTrackingScreen(),
+              const SizedBox.shrink(),
 
               // Tab 3: Profile Screen
               ProfileScreen(
@@ -363,7 +364,8 @@ class _HomeScreenState extends State<HomeScreen> {
               CartScreen(
                 onBrowseMenu: () => setState(() => _currentNavIndex = 0),
                 onOrderPlaced: () {
-                  setState(() => _currentNavIndex = 2);
+                  // Direct to Profile -> View Older Orders while live tracking is reserved for next version
+                  setState(() => _currentNavIndex = 3);
                 },
               ),
             ],
@@ -402,7 +404,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: AppHeader(
             notificationCount: 2,
             onNotificationTap: () {
-              setState(() => _currentNavIndex = 2);
+              setState(() => _currentNavIndex = 3);
             },
             onProfileTap: () => setState(() => _currentNavIndex = 3),
           ),

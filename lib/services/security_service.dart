@@ -2,15 +2,19 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../models/food_models.dart';
 import '../data/sample_data.dart';
+import '../utils/ghana_phone.dart';
+import 'cache_service.dart';
 
 enum UserRole { customer, vendor, rider, admin }
 
 /// Authenticated secure session token
+
 class UserSession {
   final String userId;
   final String email;
   final String fullName;
   final String phone;
+  final String address;
   final UserRole role;
   final String token;
   final DateTime issuedAt;
@@ -21,6 +25,7 @@ class UserSession {
     required this.email,
     required this.fullName,
     required this.phone,
+    this.address = 'Post Office Rd, Konongo',
     required this.role,
     required this.token,
     required this.issuedAt,
@@ -29,6 +34,28 @@ class UserSession {
 
   bool get isExpired => DateTime.now().isAfter(expiresAt);
   bool get isVendor => role == UserRole.vendor || role == UserRole.admin;
+
+  UserSession copyWith({
+    String? email,
+    String? fullName,
+    String? phone,
+    String? address,
+    UserRole? role,
+    String? token,
+    DateTime? expiresAt,
+  }) {
+    return UserSession(
+      userId: userId,
+      email: email ?? this.email,
+      fullName: fullName ?? this.fullName,
+      phone: phone ?? this.phone,
+      address: address ?? this.address,
+      role: role ?? this.role,
+      token: token ?? this.token,
+      issuedAt: issuedAt,
+      expiresAt: expiresAt ?? this.expiresAt,
+    );
+  }
 }
 
 /// Security audit event model
@@ -56,18 +83,46 @@ class SecurityService extends ChangeNotifier {
   static final SecurityService _instance = SecurityService._internal();
   factory SecurityService() => _instance;
 
-  SecurityService._internal();
+  SecurityService._internal() {
+    _loadCachedSession();
+  }
+
+  void _loadCachedSession() {
+    final cached = CacheService().getCachedSession();
+    if (cached != null && !cached.isExpired) {
+      _currentSession = cached;
+    }
+  }
 
   UserSession? _currentSession;
   UserSession? get currentSession => _currentSession;
 
   void setSession(UserSession session) {
     _currentSession = session;
+    CacheService().cacheSession(session);
+    notifyListeners();
+  }
+
+  void updateSessionProfile({
+    String? fullName,
+    String? phone,
+    String? address,
+    String? email,
+  }) {
+    if (_currentSession == null) return;
+    _currentSession = _currentSession!.copyWith(
+      fullName: fullName,
+      phone: phone,
+      address: address,
+      email: email,
+    );
+    CacheService().cacheSession(_currentSession!);
     notifyListeners();
   }
 
   void clearSession() {
     _currentSession = null;
+    CacheService().clearCachedSession();
     notifyListeners();
   }
 
@@ -109,12 +164,8 @@ class SecurityService extends ChangeNotifier {
     return null;
   }
 
-  /// Validate Ghanaian phone numbers (MTN, Telecel, AT)
-  bool isValidGhanaianPhone(String phone) {
-    final clean = phone.replaceAll(RegExp(r'[\s\-()]'), '');
-    final ghanaianPhoneRegex = RegExp(r'^(0|\+233)(20|24|25|26|27|28|50|54|55|59|57)[0-9]{7}$');
-    return ghanaianPhoneRegex.hasMatch(clean);
-  }
+  /// Validate Ghanaian mobile numbers in any common format (see [GhanaPhone]).
+  bool isValidGhanaianPhone(String phone) => GhanaPhone.isValid(phone);
 
   /// Sanitize text inputs against script injection & malicious payloads
   String sanitizeInput(String input) {
@@ -228,6 +279,9 @@ class SecurityService extends ChangeNotifier {
     required String email,
     required String password,
     required bool isVendorLogin,
+    String? fullName,
+    String? phone,
+    String? address,
   }) async {
     final sanitizedEmail = sanitizeInput(email).toLowerCase();
 
@@ -238,23 +292,46 @@ class SecurityService extends ChangeNotifier {
     }
 
     // Simulate verification with salt hash
-    await Future.delayed(const Duration(milliseconds: 600));
+    await Future.delayed(const Duration(milliseconds: 300));
 
     final role = isVendorLogin ? UserRole.vendor : UserRole.customer;
     final token = 'jwt_cb_${DateTime.now().microsecondsSinceEpoch}_${role.name}';
 
+    // Resolve name from explicit fullName, email prefix, or clean fallback
+    String resolvedName = (fullName != null && fullName.trim().isNotEmpty)
+        ? fullName.trim()
+        : '';
+    if (resolvedName.isEmpty) {
+      if (sanitizedEmail.contains('@')) {
+        final prefix = sanitizedEmail.split('@').first;
+        final words = prefix
+            .replaceAll(RegExp(r'[._\-]'), ' ')
+            .split(' ')
+            .where((w) => w.isNotEmpty)
+            .map((w) => w[0].toUpperCase() + (w.length > 1 ? w.substring(1) : ''))
+            .toList();
+        if (words.isNotEmpty) {
+          resolvedName = words.join(' ');
+        }
+      }
+      if (resolvedName.isEmpty) {
+        resolvedName = isVendorLogin ? 'Vendor Partner' : 'ClickBite Customer';
+      }
+    }
+
     final session = UserSession(
       userId: 'usr_${DateTime.now().millisecondsSinceEpoch}',
       email: sanitizedEmail,
-      fullName: isVendorLogin ? 'Vendor Partner' : 'Customer Account',
-      phone: '0245550192',
+      fullName: resolvedName,
+      phone: (phone != null && phone.trim().isNotEmpty) ? phone.trim() : '',
+      address: address ?? 'Post Office Rd, Konongo',
       role: role,
       token: token,
       issuedAt: DateTime.now(),
       expiresAt: DateTime.now().add(const Duration(days: 7)),
     );
 
-    _currentSession = session;
+    setSession(session);
     _failedAttempts.remove(sanitizedEmail);
 
     logSecurityEvent(
@@ -264,7 +341,6 @@ class SecurityService extends ChangeNotifier {
       details: 'User authenticated with role: ${role.name}',
     );
 
-    notifyListeners();
     return session;
   }
 

@@ -107,7 +107,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
             const SizedBox(height: 24),
             Center(
               child: Text(
-                'Data Protection Officer • privacy@clickbites.com.gh',
+                'Data Protection Officer • help@clickbitegh.com • +233535548343',
                 style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
               ),
             ),

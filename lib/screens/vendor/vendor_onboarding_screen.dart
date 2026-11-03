@@ -2,7 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
 import '../../state/vendor_state.dart';
+import '../../models/vendor_models.dart';
+import '../../models/food_models.dart';
+import '../../services/cache_service.dart';
 import '../../widgets/bouncy_tap.dart';
+import 'vendor_shell_screen.dart';
+
+/// Helper state for configuring curated dish prices, images, and addons
+class _DishCustomizationConfig {
+  double price;
+  bool isCustomImage;
+  String customImage;
+  final Set<String> addonIds;
+  final Map<String, double> addonPrices;
+
+  _DishCustomizationConfig({
+    required this.price,
+    this.isCustomImage = false,
+    required this.customImage,
+    required this.addonIds,
+    required this.addonPrices,
+  });
+}
 
 /// Interactive Vendor Onboarding Wizard for new Konongo restaurants
 class VendorOnboardingScreen extends StatefulWidget {
@@ -36,11 +57,35 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
     'Chilled Beverages',
   ];
 
-  // Step 3: Addons Selection
-  final Set<String> _selectedAddonIds = {'add-1', 'add-2', 'add-3', 'add-4', 'add-6'};
+  // Step 3: Addons Selection (Includes Soft Drinks and Bottled Water)
+  final Set<String> _selectedAddonIds = {
+    'add-1',
+    'add-2',
+    'add-3',
+    'add-4',
+    'add-6',
+    'add-9',
+    'add-10',
+  };
 
-  // Step 4: Curated Gallery Selection
+  // Step 4: Curated Gallery Selection & Per-Dish Configurations
   final Set<String> _selectedGalleryItemIds = {'gal-1', 'gal-2', 'gal-3', 'gal-4'};
+  final Map<String, _DishCustomizationConfig> _dishConfigs = {};
+
+  _DishCustomizationConfig _getDishConfig(CuratedFoodGalleryItem item) {
+    return _dishConfigs.putIfAbsent(
+      item.id,
+      () => _DishCustomizationConfig(
+        price: item.defaultPrice,
+        isCustomImage: false,
+        customImage: item.imageAsset,
+        addonIds: Set.from(_selectedAddonIds),
+        addonPrices: {
+          for (final a in VendorState().availableAddons) a.id: a.price,
+        },
+      ),
+    );
+  }
 
   // Eatery Banner Selection
   String _selectedBannerAsset = 'assets/images/jollof_rice.png';
@@ -120,27 +165,80 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
   void _submitOnboarding() {
     final vendor = VendorState();
 
-    final chosenGalleryItems = vendor.curatedGallery
-        .where((item) => _selectedGalleryItemIds.contains(item.id))
-        .toList();
+    final chosenDishes = <CustomizedVendorDish>[];
+
+    for (final itemId in _selectedGalleryItemIds) {
+      final curated = vendor.curatedGallery.firstWhere(
+        (item) => item.id == itemId,
+        orElse: () => vendor.curatedGallery.first,
+      );
+
+      final config = _getDishConfig(curated);
+
+      // Collect configured addons for this meal
+      final dishAddons = <DishAddon>[];
+      for (final addonId in config.addonIds) {
+        final opt = vendor.availableAddons.firstWhere(
+          (a) => a.id == addonId,
+          orElse: () => VendorAddonOption(id: addonId, name: 'Addon', price: 5.0),
+        );
+        final customPrice = config.addonPrices[addonId] ?? opt.price;
+        String cat = 'side';
+        if (opt.id == 'add-4' || opt.id == 'add-5') cat = 'protein';
+        if (opt.id == 'add-2') cat = 'protein';
+        if (opt.id == 'add-3') cat = 'sauce';
+        if (opt.id == 'add-9' || opt.id == 'add-10') cat = 'drink';
+
+        dishAddons.add(DishAddon(
+          id: opt.id,
+          name: opt.name,
+          price: customPrice,
+          category: cat,
+          imageAsset: null,
+          quantity: 1,
+        ));
+      }
+
+      chosenDishes.add(CustomizedVendorDish(
+        id: 'custom-${curated.id}-${DateTime.now().millisecondsSinceEpoch}',
+        curatedItemId: curated.id,
+        title: curated.title,
+        category: curated.category,
+        imageAsset: config.isCustomImage ? config.customImage : curated.imageAsset,
+        isCustomImage: config.isCustomImage,
+        price: config.price,
+        description: curated.description,
+        selectedAddons: dishAddons,
+        isAvailable: true,
+      ));
+    }
 
     final chosenAddons = vendor.availableAddons
         .where((item) => _selectedAddonIds.contains(item.id))
         .toList();
 
     vendor.onboardNewKitchen(
-      restaurantName: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : 'Nana Kitchen',
-      ownerName: _ownerController.text.trim().isNotEmpty ? _ownerController.text.trim() : 'Akua Mansa',
+      restaurantName: _nameController.text.trim().isNotEmpty
+          ? _nameController.text.trim()
+          : 'Nana Kitchen',
+      ownerName: _ownerController.text.trim().isNotEmpty
+          ? _ownerController.text.trim()
+          : 'Akua Mansa',
       phone: _phoneController.text,
       momoNumber: _momoController.text,
       address: _selectedLocation,
       cuisineSummary: _selectedCategories.join(' • '),
       bannerAsset: _selectedBannerAsset,
-      selectedDishes: chosenGalleryItems,
+      customizedDishes: chosenDishes,
       selectedAddons: chosenAddons,
     );
 
-    Navigator.pop(context);
+    CacheService().setVendorOnboarded(true);
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const VendorShellScreen()),
+    );
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -149,7 +247,7 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                '${_nameController.text} is now LIVE on ClickBite Konongo!',
+                '${_nameController.text} is now LIVE on ClickBite Konongo! You can edit meals anytime from the My Meals tab.',
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
@@ -157,7 +255,7 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
         ),
         backgroundColor: AppColors.success,
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
+        duration: const Duration(seconds: 4),
       ),
     );
   }
@@ -671,33 +769,91 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
     );
   }
 
-  // Step 4: Curated Food Image Gallery
+  // Step 4: Curated Food Image Gallery & Dish Customization
   Widget _buildStep4Gallery() {
     final vendor = VendorState();
+
+    // Filter curated dishes based on selected categories from Step 2
+    final matchingDishes = vendor.curatedGallery.where((item) {
+      if (_selectedCategories.isEmpty) return true;
+      return _selectedCategories.any((cat) =>
+          cat.toLowerCase().contains(item.category.toLowerCase()) ||
+          item.category.toLowerCase().contains(cat.toLowerCase()) ||
+          (cat.contains('Jollof') && item.title.contains('Jollof')) ||
+          (cat.contains('Fish') && item.title.contains('Tilapia')) ||
+          (cat.contains('Waakye') && item.title.contains('Waakye')) ||
+          (cat.contains('Soup') && item.category.contains('Soup')));
+    }).toList();
+
+    final displayItems =
+        matchingDishes.isNotEmpty ? matchingDishes : vendor.curatedGallery;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Step 4: Select Curated Dishes',
-          style: GoogleFonts.playfairDisplay(fontSize: 19, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
+          'Step 4: Curated Dishes & Pricing',
+          style: GoogleFonts.playfairDisplay(
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+              color: AppColors.textPrimary),
         ),
         const SizedBox(height: 4),
         Text(
-          'Pick from our curated gallery of authentic food photos to feature on your menu.',
+          'Customize prices, configure add-ons & add-on pricing, and select curated or custom photos for each meal.',
           style: AppTypography.caption(context).copyWith(fontSize: 12),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 12),
 
-        ...vendor.curatedGallery.map((item) {
+        // Cuisines indicator badge
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.primarySubtle.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.restaurant_rounded,
+                  size: 16, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Cuisines: ${_selectedCategories.join(', ')}',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Text(
+                '${displayItems.length} available',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        ...displayItems.map((item) {
           final isSelected = _selectedGalleryItemIds.contains(item.id);
+          final config = _getDishConfig(item);
 
           return Container(
-            margin: const EdgeInsets.only(bottom: 14),
+            margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(AppRadius.xl),
-              boxShadow: AppShadows.card,
+              boxShadow: isSelected ? AppShadows.card : AppShadows.soft,
               border: Border.all(
                 color: isSelected ? AppColors.primary : AppColors.border,
                 width: isSelected ? 2 : 1,
@@ -707,51 +863,79 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Dish Image Header
                 Stack(
                   children: [
                     Image.asset(
-                      item.imageAsset,
-                      height: 120,
+                      config.isCustomImage
+                          ? config.customImage
+                          : item.imageAsset,
+                      height: 130,
                       width: double.infinity,
                       fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        height: 130,
+                        color: AppColors.surfaceElevated,
+                        child: const Center(
+                          child: Icon(Icons.fastfood_rounded,
+                              size: 36, color: AppColors.primary),
+                        ),
+                      ),
                     ),
+                    // Image Badge
+                    Positioned(
+                      top: 10,
+                      left: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3.5),
+                        decoration: BoxDecoration(
+                          color: config.isCustomImage
+                              ? AppColors.accent
+                              : Colors.black.withValues(alpha: 0.75),
+                          borderRadius: BorderRadius.circular(AppRadius.xs),
+                        ),
+                        child: Text(
+                          config.isCustomImage
+                              ? 'CUSTOM PHOTO'
+                              : 'CURATED PHOTO',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Category Badge
                     Positioned(
                       top: 10,
                       right: 10,
                       child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: isSelected ? AppColors.primary : Colors.black.withValues(alpha: 0.6),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          isSelected ? Icons.check_rounded : Icons.add_rounded,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 10,
-                      left: 10,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3.5),
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.75),
                           borderRadius: BorderRadius.circular(AppRadius.sm),
                         ),
                         child: Text(
                           item.category,
-                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
+
+                // Main Info Row & Selection Toggle
                 Padding(
                   padding: const EdgeInsets.all(14),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
                         child: Column(
@@ -759,19 +943,22 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
                           children: [
                             Text(
                               item.title,
-                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w800, fontSize: 14),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               item.description,
-                              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                              maxLines: 1,
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary),
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 10),
                       BouncyTap(
                         onTap: () {
                           setState(() {
@@ -783,24 +970,424 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
                           });
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 7),
                           decoration: BoxDecoration(
-                            color: isSelected ? AppColors.primarySubtle : AppColors.primary,
-                            borderRadius: BorderRadius.circular(AppRadius.full),
-                          ),
-                          child: Text(
-                            isSelected ? 'Selected' : 'Select Dish',
-                            style: TextStyle(
-                              color: isSelected ? AppColors.primary : Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 11.5,
+                            color: isSelected
+                                ? AppColors.primary
+                                : AppColors.surfaceElevated,
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.full),
+                            border: Border.all(
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : AppColors.border,
                             ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isSelected
+                                    ? Icons.check_rounded
+                                    : Icons.add_rounded,
+                                size: 14,
+                                color: isSelected
+                                    ? Colors.white
+                                    : AppColors.textPrimary,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                isSelected ? 'Selected' : 'Select Dish',
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? Colors.white
+                                      : AppColors.textPrimary,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 11.5,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
+
+                // Expanded Customization Section if Selected
+                if (isSelected) ...[
+                  const Divider(height: 1),
+                  Container(
+                    color: AppColors.surfaceElevated.withValues(alpha: 0.4),
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 1. Price Adjustment Controls
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Your Menu Price:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12.5,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                BouncyTap(
+                                  onTap: () {
+                                    if (config.price > 5) {
+                                      setState(() => config.price -= 5);
+                                    }
+                                  },
+                                  child: Container(
+                                    width: 30,
+                                    height: 30,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surface,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: AppColors.border),
+                                    ),
+                                    child: const Center(
+                                      child: Icon(Icons.remove_rounded,
+                                          size: 16,
+                                          color: AppColors.primary),
+                                    ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10),
+                                  child: Text(
+                                    'GH₵${config.price.toStringAsFixed(2)}',
+                                    style: GoogleFonts.playfairDisplay(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ),
+                                BouncyTap(
+                                  onTap: () {
+                                    setState(() => config.price += 5);
+                                  },
+                                  child: Container(
+                                    width: 30,
+                                    height: 30,
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.primary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Center(
+                                      child: Icon(Icons.add_rounded,
+                                          size: 16, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        // 2. Photo Decision (Curated vs Custom)
+                        const Text(
+                          'Food Photo:',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            BouncyTap(
+                              onTap: () => setState(
+                                  () => config.isCustomImage = false),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: !config.isCustomImage
+                                      ? AppColors.primary
+                                      : AppColors.surface,
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.md),
+                                  border: Border.all(
+                                    color: !config.isCustomImage
+                                        ? AppColors.primary
+                                        : AppColors.border,
+                                  ),
+                                ),
+                                child: Text(
+                                  'Use Curated Photo',
+                                  style: TextStyle(
+                                    color: !config.isCustomImage
+                                        ? Colors.white
+                                        : AppColors.textSecondary,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            BouncyTap(
+                              onTap: () => setState(
+                                  () => config.isCustomImage = true),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: config.isCustomImage
+                                      ? AppColors.primary
+                                      : AppColors.surface,
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.md),
+                                  border: Border.all(
+                                    color: config.isCustomImage
+                                        ? AppColors.primary
+                                        : AppColors.border,
+                                  ),
+                                ),
+                                child: Text(
+                                  'Pick Alternative Photo',
+                                  style: TextStyle(
+                                    color: config.isCustomImage
+                                        ? Colors.white
+                                        : AppColors.textSecondary,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        // Alternative Photos Palette if Custom Selected
+                        if (config.isCustomImage) ...[
+                          const SizedBox(height: 8),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            child: Row(
+                              children: [
+                                'assets/images/jollof_rice.png',
+                                'assets/images/fufu_soup.png',
+                                'assets/images/grilled_tilapia.png',
+                                'assets/images/waakye.png',
+                                'assets/images/red_red.png',
+                                'assets/images/ampesi_kontommire.png',
+                                'assets/images/assorted fried_rice.png',
+                                'assets/images/assorted_jollof.png',
+                                'assets/images/kokonte_soup.png',
+                                'assets/images/shawarma.png',
+                                'assets/images/tuo_zaafi.png',
+                                'assets/images/waakye_2.png',
+                              ].map((assetPath) {
+                                final isCurSelected =
+                                    config.customImage == assetPath;
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: InkWell(
+                                    onTap: () => setState(() =>
+                                        config.customImage = assetPath),
+                                    child: Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(
+                                            AppRadius.sm),
+                                        border: Border.all(
+                                          color: isCurSelected
+                                              ? AppColors.primary
+                                              : AppColors.border,
+                                          width: isCurSelected ? 2 : 1,
+                                        ),
+                                      ),
+                                      clipBehavior: Clip.antiAlias,
+                                      child: Image.asset(assetPath,
+                                          fit: BoxFit.cover),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 14),
+
+                        // 3. Add-ons & Custom Addon Pricing for this Meal
+                        Row(
+                          mainAxisAlignment:
+                              MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Add-ons for this Meal:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              '${config.addonIds.length} enabled',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Only selected add-ons will appear on the customer meal sheet with your pricing.',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Addons check & price adjuster list
+                        ...vendor.availableAddons.map((addon) {
+                          final isAddonActive =
+                              config.addonIds.contains(addon.id);
+                          final currentPrice =
+                              config.addonPrices[addon.id] ?? addon.price;
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isAddonActive
+                                  ? AppColors.primarySubtle
+                                      .withValues(alpha: 0.35)
+                                  : AppColors.surface,
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.md),
+                              border: Border.all(
+                                color: isAddonActive
+                                    ? AppColors.primary
+                                    : AppColors.border,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Checkbox(
+                                  value: isAddonActive,
+                                  activeColor: AppColors.primary,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      if (val == true) {
+                                        config.addonIds.add(addon.id);
+                                        config.addonPrices[addon.id] =
+                                            addon.price;
+                                      } else {
+                                        config.addonIds.remove(addon.id);
+                                      }
+                                    });
+                                  },
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    addon.name,
+                                    style: TextStyle(
+                                      fontWeight: isAddonActive
+                                          ? FontWeight.w800
+                                          : FontWeight.w600,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                                if (isAddonActive)
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      BouncyTap(
+                                        onTap: () {
+                                          if (currentPrice > 1) {
+                                            setState(() =>
+                                                config.addonPrices[addon.id] =
+                                                    currentPrice - 1);
+                                          }
+                                        },
+                                        child: Container(
+                                          width: 22,
+                                          height: 22,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.surface,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                                color: AppColors.border),
+                                          ),
+                                          child: const Center(
+                                            child: Icon(
+                                                Icons.remove_rounded,
+                                                size: 12,
+                                                color: AppColors.primary),
+                                          ),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6),
+                                        child: Text(
+                                          'GH₵${currentPrice.toStringAsFixed(0)}',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                            color: AppColors.primary,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                      BouncyTap(
+                                        onTap: () {
+                                          setState(() =>
+                                              config.addonPrices[addon.id] =
+                                                  currentPrice + 1);
+                                        },
+                                        child: Container(
+                                          width: 22,
+                                          height: 22,
+                                          decoration: const BoxDecoration(
+                                            color: AppColors.primary,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Center(
+                                            child: Icon(Icons.add_rounded,
+                                                size: 12,
+                                                color: Colors.white),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                else
+                                  Text(
+                                    '+GH₵${addon.price.toStringAsFixed(0)}',
+                                    style: const TextStyle(
+                                      color: AppColors.textTertiary,
+                                      fontSize: 11.5,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           );

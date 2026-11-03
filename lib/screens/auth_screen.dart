@@ -3,13 +3,18 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import '../utils/ghana_phone.dart';
 import '../theme/app_theme.dart';
 import '../services/security_service.dart';
 import '../services/firebase_auth_service.dart';
 import 'home_screen.dart';
 import 'vendor/vendor_shell_screen.dart';
+import 'vendor/vendor_onboarding_screen.dart';
 import 'legal/terms_of_service_screen.dart';
 import 'legal/privacy_policy_screen.dart';
+import 'live_location_screen.dart';
+import '../services/cache_service.dart';
 
 /// ClickBite Authentication Screen
 /// Clean, premium design with vendor/customer sign-in branching.
@@ -26,10 +31,10 @@ class _AuthScreenState extends State<AuthScreen>
   final SecurityService _security = SecurityService();
   final FirebaseAuthService _firebaseAuth = FirebaseAuthService();
 
-  // Auth mode
-  bool _isSignUp = false;
+  // Auth mode - default to Sign Up so every new user is welcomed with Create Account
+  bool _isSignUp = true;
   bool _isVendor = false;
-  bool _isPhoneAuth = true; // Default to Ghana Phone SMS OTP
+  bool _isPhoneAuth = false; // Default to Email & Password (SMS OTP still available)
   bool _otpSent = false;
   String? _verificationId;
   int _resendCountdown = 60;
@@ -104,32 +109,36 @@ class _AuthScreenState extends State<AuthScreen>
   }
 
   void _detectNetwork(String val) {
-    final clean = val.replaceAll(RegExp(r'[\s\-()]'), '');
-    String prefix = '';
-    if (clean.startsWith('+233')) {
-      prefix = clean.substring(4);
-    } else if (clean.startsWith('233')) {
-      prefix = clean.substring(3);
-    } else if (clean.startsWith('0')) {
-      prefix = clean.substring(1);
-    } else {
-      prefix = clean;
-    }
-
-    String network = '';
-    if (prefix.length >= 2) {
-      final code = prefix.substring(0, 2);
-      if (['24', '54', '55', '59', '53'].contains(code)) {
-        network = 'MTN';
-      } else if (['20', '50'].contains(code)) {
-        network = 'Telecel';
-      } else if (['27', '57', '26'].contains(code)) {
-        network = 'AT';
-      }
-    }
     setState(() {
-      _detectedNetwork = network;
+      _detectedNetwork = GhanaPhone.networkOf(val);
     });
+  }
+
+  Future<void> _socialSignIn({required bool apple}) async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+    try {
+      await _firebaseAuth.signInWithSocial(
+        apple: apple,
+        role: _isVendor ? UserRole.vendor : UserRole.customer,
+      );
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _navigateToApp();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            FirebaseAuthService.friendlyAuthError(e),
+            style: GoogleFonts.plusJakartaSans(),
+          ),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _toggleMode() {
@@ -143,11 +152,24 @@ class _AuthScreenState extends State<AuthScreen>
     _fadeController.forward();
   }
 
-  void _navigateToApp() {
+  void _navigateToApp({bool? forceSignUp}) {
+    final isNewAccount = forceSignUp ?? _isSignUp;
+    Widget destination;
+    if (_isVendor) {
+      if (isNewAccount || !CacheService().isVendorOnboarded()) {
+        destination = const VendorOnboardingScreen();
+      } else {
+        destination = const VendorShellScreen();
+      }
+    } else {
+      destination = isNewAccount
+          ? LiveLocationScreen(isVendor: false, isMandatory: true)
+          : const HomeScreen();
+    }
+
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            _isVendor ? const VendorShellScreen() : const HomeScreen(),
+        pageBuilder: (context, animation, secondaryAnimation) => destination,
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(
             opacity: CurvedAnimation(parent: animation, curve: Curves.easeIn),
@@ -336,6 +358,12 @@ class _AuthScreenState extends State<AuthScreen>
           email: _emailController.text,
           password: _passwordController.text,
           isVendorLogin: _isVendor,
+          fullName: _nameController.text.trim().isNotEmpty
+              ? _nameController.text.trim()
+              : null,
+          phone: _phoneController.text.trim().isNotEmpty
+              ? _phoneController.text.trim()
+              : null,
         );
 
         if (!mounted) return;
@@ -806,17 +834,17 @@ class _AuthScreenState extends State<AuthScreen>
                                 children: [
                                   Expanded(
                                     child: _buildSocialButton(
-                                      icon: Icons.g_mobiledata_rounded,
+                                      logoAsset: 'assets/icons/google_logo.svg',
                                       label: 'Google',
-                                      onTap: () {},
+                                      onTap: () => _socialSignIn(apple: false),
                                     ),
                                   ),
                                   const SizedBox(width: AppSpacing.md),
                                   Expanded(
                                     child: _buildSocialButton(
-                                      icon: Icons.apple_rounded,
+                                      logoAsset: 'assets/icons/apple_logo.svg',
                                       label: 'Apple',
-                                      onTap: () {},
+                                      onTap: () => _socialSignIn(apple: true),
                                     ),
                                   ),
                                 ],
@@ -1496,16 +1524,19 @@ class _AuthScreenState extends State<AuthScreen>
 
   // ─── Social Button ─────────────────────────────────────────────
   Widget _buildSocialButton({
-    required IconData icon,
+    required String logoAsset,
     required String label,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
+    return Material(
+      color: AppColors.surfaceElevated,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: InkWell(
+      onTap: _isLoading ? null : onTap,
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: Container(
         height: 48,
         decoration: BoxDecoration(
-          color: AppColors.surfaceElevated,
           borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(color: AppColors.border, width: 1),
         ),
@@ -1513,8 +1544,8 @@ class _AuthScreenState extends State<AuthScreen>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 22, color: AppColors.textSecondary),
-              const SizedBox(width: 8),
+              SvgPicture.asset(logoAsset, width: 20, height: 20),
+              const SizedBox(width: 10),
               Text(
                 label,
                 style: GoogleFonts.plusJakartaSans(
@@ -1526,6 +1557,7 @@ class _AuthScreenState extends State<AuthScreen>
             ],
           ),
         ),
+      ),
       ),
     );
   }

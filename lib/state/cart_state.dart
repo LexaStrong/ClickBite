@@ -20,7 +20,8 @@ class CartItem {
     this.notes,
   }) : id = id ?? '${foodItem.id}_${DateTime.now().microsecondsSinceEpoch}';
 
-  double get addonsPrice => selectedAddons.fold(0.0, (sum, a) => sum + a.price);
+  double get addonsPrice =>
+      selectedAddons.fold(0.0, (sum, a) => sum + (a.price * a.quantity));
   double get unitPrice => foodItem.price + addonsPrice;
   double get totalPrice => unitPrice * quantity;
 }
@@ -56,10 +57,37 @@ class CartState extends ChangeNotifier {
   String _paymentMethod = 'MTN Mobile Money';
   String? _activeOrderId;
 
+  // Order for someone else
+  bool _isForSomeoneElse = false;
+  String _recipientName = '';
+  String _recipientPhone = '';
+  String _recipientNote = '';
+
   List<CartItem> get items => List.unmodifiable(_items);
   String get selectedAddress => _selectedAddress;
   String get paymentMethod => _paymentMethod;
   String? get activeOrderId => _activeOrderId;
+
+  bool get isForSomeoneElse => _isForSomeoneElse;
+  String get recipientName => _recipientName;
+  String get recipientPhone => _recipientPhone;
+  String get recipientNote => _recipientNote;
+
+  void setForSomeoneElse(bool value) {
+    _isForSomeoneElse = value;
+    notifyListeners();
+  }
+
+  void setRecipientDetails({
+    required String name,
+    required String phone,
+    String note = '',
+  }) {
+    _recipientName = name;
+    _recipientPhone = phone;
+    _recipientNote = note;
+    notifyListeners();
+  }
 
   void setActiveOrderId(String? id) {
     _activeOrderId = id;

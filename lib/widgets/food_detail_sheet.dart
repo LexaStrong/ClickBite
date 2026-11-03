@@ -38,7 +38,7 @@ class _FoodDetailSheetState extends State<FoodDetailSheet> {
 
   int _quantity = 1;
   String _selectedSpice = 'Regular Pepper';
-  final Set<DishAddon> _selectedAddons = {};
+  final Map<String, int> _addonQuantities = {};
 
   final List<String> _spiceOptions = const [
     'Mild Shito',
@@ -50,19 +50,23 @@ class _FoodDetailSheetState extends State<FoodDetailSheet> {
   String _selectedAddonCategory = 'all';
 
   List<DishAddon> get _filteredAddons {
-    if (_selectedAddonCategory == 'all') return standardGhanaianAddons;
+    final sourceList = widget.item.availableAddons.isNotEmpty
+        ? widget.item.availableAddons
+        : standardGhanaianAddons;
+
+    if (_selectedAddonCategory == 'all') return sourceList;
     if (_selectedAddonCategory == 'protein') {
-      return standardGhanaianAddons
+      return sourceList
           .where((a) => a.category == 'protein' || a.category == 'side' || a.category == 'sauce')
           .toList();
     }
     if (_selectedAddonCategory == 'snack') {
-      return standardGhanaianAddons.where((a) => a.category == 'snack').toList();
+      return sourceList.where((a) => a.category == 'snack').toList();
     }
     if (_selectedAddonCategory == 'drink') {
-      return standardGhanaianAddons.where((a) => a.category == 'drink').toList();
+      return sourceList.where((a) => a.category == 'drink').toList();
     }
-    return standardGhanaianAddons;
+    return sourceList;
   }
 
   @override
@@ -71,28 +75,43 @@ class _FoodDetailSheetState extends State<FoodDetailSheet> {
     super.dispose();
   }
 
-  double get _addonsTotal =>
-      _selectedAddons.fold(0.0, (sum, addon) => sum + addon.price);
+  double get _addonsTotal => _filteredAddons.fold(
+      0.0, (sum, addon) => sum + (addon.price * (_addonQuantities[addon.id] ?? 0)));
 
   double get _unitPrice => widget.item.price + _addonsTotal;
 
   double get _totalPrice => _unitPrice * _quantity;
 
-  void _toggleAddon(DishAddon addon) {
+  void _incrementAddon(DishAddon addon) {
     setState(() {
-      if (_selectedAddons.contains(addon)) {
-        _selectedAddons.remove(addon);
+      final current = _addonQuantities[addon.id] ?? 0;
+      if (current < 10) {
+        _addonQuantities[addon.id] = current + 1;
+      }
+    });
+  }
+
+  void _decrementAddon(DishAddon addon) {
+    setState(() {
+      final current = _addonQuantities[addon.id] ?? 0;
+      if (current > 1) {
+        _addonQuantities[addon.id] = current - 1;
       } else {
-        _selectedAddons.add(addon);
+        _addonQuantities.remove(addon.id);
       }
     });
   }
 
   void _submitAddToCart() {
+    final selectedList = _filteredAddons
+        .where((a) => (_addonQuantities[a.id] ?? 0) > 0)
+        .map((a) => a.copyWith(quantity: _addonQuantities[a.id]!))
+        .toList();
+
     final cartItem = CartItem(
       foodItem: widget.item,
       quantity: _quantity,
-      selectedAddons: _selectedAddons.toList(),
+      selectedAddons: selectedList,
       spiceLevel: _selectedSpice,
       notes: _notesController.text.trim().isEmpty
           ? null
@@ -102,7 +121,7 @@ class _FoodDetailSheetState extends State<FoodDetailSheet> {
     _cart.addItem(
       widget.item,
       quantity: _quantity,
-      selectedAddons: _selectedAddons.toList(),
+      selectedAddons: selectedList,
       spiceLevel: _selectedSpice,
       notes: _notesController.text.trim().isEmpty
           ? null
@@ -426,7 +445,7 @@ class _FoodDetailSheetState extends State<FoodDetailSheet> {
                                 border: Border.all(color: AppColors.border),
                               ),
                               child: Text(
-                                '${_selectedAddons.length} SELECTED',
+                                '${_addonQuantities.values.fold(0, (sum, q) => sum + q)} SELECTED',
                                 style: const TextStyle(
                                   fontSize: 8.5,
                                   fontWeight: FontWeight.w800,
@@ -650,116 +669,172 @@ class _FoodDetailSheetState extends State<FoodDetailSheet> {
   }
 
   Widget _buildAddonRow(DishAddon addon) {
-    final isChecked = _selectedAddons.contains(addon);
+    final qty = _addonQuantities[addon.id] ?? 0;
+    final isSelected = qty > 0;
     String categoryLabel = 'Side Extra';
     if (addon.category == 'protein') categoryLabel = 'Protein';
     if (addon.category == 'sauce') categoryLabel = 'Sauce / Shito';
     if (addon.category == 'snack') categoryLabel = 'Pastry / Snack';
     if (addon.category == 'drink') categoryLabel = 'Wine / Drink';
 
-    return InkWell(
-      onTap: () => _toggleAddon(addon),
-      borderRadius: BorderRadius.circular(AppRadius.md),
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: isChecked
-              ? AppColors.primarySubtle.withValues(alpha: 0.35)
-              : AppColors.surfaceElevated.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(
-            color: isChecked
-                ? AppColors.primary.withValues(alpha: 0.4)
-                : AppColors.border.withValues(alpha: 0.6),
-            width: 1,
-          ),
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? AppColors.primarySubtle.withValues(alpha: 0.35)
+            : AppColors.surfaceElevated.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(
+          color: isSelected
+              ? AppColors.primary.withValues(alpha: 0.5)
+              : AppColors.border.withValues(alpha: 0.6),
+          width: isSelected ? 1.5 : 1,
         ),
-        child: Row(
-          children: [
-            // Checkbox
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: 22,
-              height: 22,
+      ),
+      child: Row(
+        children: [
+          // Thumbnail Image if available
+          if (addon.imageAsset != null)
+            Container(
+              width: 40,
+              height: 40,
+              margin: const EdgeInsets.only(right: 10),
               decoration: BoxDecoration(
-                color: isChecked ? AppColors.primary : Colors.transparent,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: isChecked ? AppColors.primary : AppColors.border,
-                  width: 1.5,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Image.asset(
+                addon.imageAsset!,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const Icon(
+                  Icons.fastfood_rounded,
+                  size: 20,
+                  color: AppColors.primary,
                 ),
               ),
-              child: isChecked
-                  ? const Icon(
-                      Icons.check_rounded,
-                      size: 15,
-                      color: Colors.white,
-                    )
-                  : null,
             ),
-            const SizedBox(width: 10),
 
-            // Thumbnail Image if available
-            if (addon.imageAsset != null)
-              Container(
-                width: 42,
-                height: 42,
-                margin: const EdgeInsets.only(right: 10),
+          // Title & Category tag
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  addon.name,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Text(
+                      categoryLabel,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '+GH₵${addon.price.toStringAsFixed(2)} each',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Quantity Stepper or Add Button
+          if (!isSelected)
+            BouncyTap(
+              onTap: () => _incrementAddon(addon),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.border),
+                  color: AppColors.primarySubtle,
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
                 ),
-                clipBehavior: Clip.antiAlias,
-                child: Image.asset(
-                  addon.imageAsset!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => const Icon(
-                    Icons.fastfood_rounded,
-                    size: 20,
-                    color: AppColors.primary,
-                  ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add_rounded, size: 14, color: AppColors.primary),
+                    SizedBox(width: 3),
+                    Text(
+                      'Add',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11.5,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-
-            // Title & Category tag
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    addon.name,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: isChecked ? FontWeight.w700 : FontWeight.w600,
-                      color: AppColors.textPrimary,
+            )
+          else
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Decrement button
+                BouncyTap(
+                  onTap: () => _decrementAddon(addon),
+                  child: Container(
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.remove_rounded, size: 14, color: AppColors.primary),
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    categoryLabel,
+                ),
+                Container(
+                  constraints: const BoxConstraints(minWidth: 26),
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    '$qty',
                     style: const TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textTertiary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.primary,
                     ),
                   ),
-                ],
-              ),
+                ),
+                // Increment button
+                BouncyTap(
+                  onTap: () => _incrementAddon(addon),
+                  child: Container(
+                    width: 26,
+                    height: 26,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.add_rounded, size: 14, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
             ),
-
-            // Addon Price
-            Text(
-              '+GH₵${addon.price.toStringAsFixed(2)}',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w800,
-                color: isChecked ? AppColors.primary : AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }

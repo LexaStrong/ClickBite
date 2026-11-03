@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/bouncy_tap.dart';
 import 'vendor_dashboard_screen.dart';
+import 'vendor_menu_screen.dart';
 import 'vendor_orders_screen.dart';
 import 'vendor_payments_screen.dart';
 import 'vendor_analytics_screen.dart';
@@ -106,6 +107,7 @@ class _VendorShellScreenState extends State<VendorShellScreen> {
                     index: _currentNavIndex,
                     children: [
                       VendorDashboardScreen(onNavigateTab: (idx) => setState(() => _currentNavIndex = idx)),
+                      const VendorMenuScreen(),
                       const VendorOrdersScreen(),
                       const VendorPaymentsScreen(),
                       const VendorAnalyticsScreen(),
@@ -141,14 +143,15 @@ class _VendorShellScreenState extends State<VendorShellScreen> {
         border: Border.all(color: AppColors.border, width: 1),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 6),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _buildTabItem(0, Icons.dashboard_rounded, Icons.dashboard_outlined, 'Dashboard'),
-            _buildTabItem(1, Icons.soup_kitchen_rounded, Icons.soup_kitchen_outlined, 'Orders'),
-            _buildTabItem(2, Icons.payments_rounded, Icons.payments_outlined, 'Payouts'),
-            _buildTabItem(3, Icons.insights_rounded, Icons.insights_outlined, 'Analytics'),
+            _buildTabItem(1, Icons.restaurant_menu_rounded, Icons.restaurant_menu_outlined, 'My Meals'),
+            _buildTabItem(2, Icons.soup_kitchen_rounded, Icons.soup_kitchen_outlined, 'Orders'),
+            _buildTabItem(3, Icons.payments_rounded, Icons.payments_outlined, 'Payouts'),
+            _buildTabItem(4, Icons.insights_rounded, Icons.insights_outlined, 'Analytics'),
           ],
         ),
       ),

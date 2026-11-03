@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../services/cache_service.dart';
 import 'auth_screen.dart';
 
 /// ClickBite Onboarding Flow
@@ -95,6 +96,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         curve: Curves.easeInOutCubic,
       );
     } else {
+      // Mark onboarding as completed so subsequent app opens go directly to auth/home
+      CacheService().setHasSeenOnboarding(true);
       // Navigate to auth
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
@@ -116,6 +119,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   void _skipToAuth() {
+    CacheService().setHasSeenOnboarding(true);
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>

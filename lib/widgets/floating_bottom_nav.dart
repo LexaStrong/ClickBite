@@ -59,14 +59,14 @@ class FloatingBottomNav extends StatelessWidget {
             // Center Elevated Cart Button
             _buildCenterCartButton(context),
 
-            // Tab 2: Track (Replaced Rewards with Live Tracking)
-            _buildTabPill(
-              context: context,
-              index: 2,
-              icon: Icons.moped_rounded,
-              unselectedIcon: Icons.moped_outlined,
-              label: 'Track',
-            ),
+            // Tab 2: Track (Commented out for the next version)
+            // _buildTabPill(
+            //   context: context,
+            //   index: 2,
+            //   icon: Icons.moped_rounded,
+            //   unselectedIcon: Icons.moped_outlined,
+            //   label: 'Track',
+            // ),
 
             // Tab 3: Profile
             _buildTabPill(

@@ -164,13 +164,13 @@ class AboutUsScreen extends StatelessWidget {
                   _buildContactRow(
                     Icons.phone_in_talk_rounded,
                     'Customer Hotline',
-                    '+233 (0) 24 555 0192 / +233 (0) 50 123 4567',
+                    '+233535548343 (+233 53 554 8343)',
                   ),
                   const Divider(height: 20),
                   _buildContactRow(
                     Icons.email_outlined,
                     'Support Email',
-                    'support@clickbites.com.gh',
+                    'help@clickbitegh.com',
                   ),
                 ],
               ),

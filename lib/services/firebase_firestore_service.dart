@@ -148,6 +148,7 @@ class FirebaseFirestoreService {
   }
 
   /// Submit a new customer order with automatic offline queuing
+  /// Submit a new customer order with automatic offline queuing
   Future<String> submitOrder({
     required String customerId,
     required String customerName,
@@ -161,6 +162,10 @@ class FirebaseFirestoreService {
     required String paymentMethod,
     String? deliveryNotes,
     String? momoReference,
+    bool isForSomeoneElse = false,
+    String? recipientName,
+    String? recipientPhone,
+    String? recipientNote,
   }) async {
     final orderDoc = _ordersCol.doc();
     final orderId = orderDoc.id;
@@ -181,6 +186,10 @@ class FirebaseFirestoreService {
       'orderStatus': 'PENDING',
       'deliveryNotes': deliveryNotes ?? '',
       'momoReference': momoReference ?? '',
+      'isForSomeoneElse': isForSomeoneElse,
+      'recipientName': recipientName ?? '',
+      'recipientPhone': recipientPhone ?? '',
+      'recipientNote': recipientNote ?? '',
       'courierId': null,
       'courierLocation': null,
       'createdAt': FieldValue.serverTimestamp(),

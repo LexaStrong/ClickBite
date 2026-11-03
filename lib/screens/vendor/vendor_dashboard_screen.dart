@@ -237,7 +237,7 @@ class VendorDashboardScreen extends StatelessWidget {
                         subtitle: 'Tap to withdraw',
                         icon: Icons.payments_rounded,
                         color: AppColors.accent,
-                        onTap: () => onNavigateTab(2), // go to payments tab
+                        onTap: () => onNavigateTab(3), // go to payments tab
                       ),
                     ),
                   ],
@@ -260,7 +260,7 @@ class VendorDashboardScreen extends StatelessWidget {
                         subtitle: '${vendor.activeOrders.length} in pipeline',
                         icon: Icons.soup_kitchen_rounded,
                         color: AppColors.primaryLight,
-                        onTap: () => onNavigateTab(1), // go to orders
+                        onTap: () => onNavigateTab(2), // go to orders
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -272,7 +272,7 @@ class VendorDashboardScreen extends StatelessWidget {
                         subtitle: 'Top Rated in Konongo',
                         icon: Icons.verified_rounded,
                         color: AppColors.success,
-                        onTap: () => onNavigateTab(3), // go to analytics
+                        onTap: () => onNavigateTab(4), // go to analytics
                       ),
                     ),
                   ],
@@ -312,7 +312,7 @@ class VendorDashboardScreen extends StatelessWidget {
                       ],
                     ),
                     TextButton(
-                      onPressed: () => onNavigateTab(1),
+                      onPressed: () => onNavigateTab(2),
                       child: const Text('View All Orders', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: AppColors.primary)),
                     ),
                   ],
@@ -393,6 +393,30 @@ class VendorDashboardScreen extends StatelessWidget {
                   children: [
                     _buildActionTile(
                       context: context,
+                      icon: Icons.restaurant_menu_rounded,
+                      title: 'Edit Meals & Menu Pricing',
+                      subtitle: 'Adjust meal prices, modify addons, and toggle availability',
+                      onTap: () => onNavigateTab(1),
+                    ),
+                    const SizedBox(height: 10),
+                    _buildActionTile(
+                      context: context,
+                      icon: Icons.soup_kitchen_rounded,
+                      title: 'Live Kitchen Display (KDS)',
+                      subtitle: 'Manage food prep timers and courier dispatch for Kofi Boateng',
+                      onTap: () => onNavigateTab(2),
+                    ),
+                    const SizedBox(height: 10),
+                    _buildActionTile(
+                      context: context,
+                      icon: Icons.insights_rounded,
+                      title: 'Sales Performance & Analytics',
+                      subtitle: 'View top selling dishes, customer repeat rate & revenue trends',
+                      onTap: () => onNavigateTab(4),
+                    ),
+                    const SizedBox(height: 10),
+                    _buildActionTile(
+                      context: context,
                       icon: Icons.add_business_rounded,
                       title: 'Onboard New Kitchen / Branch',
                       subtitle: 'Setup food categories, addons, and pick curated dish photos',
@@ -404,22 +428,6 @@ class VendorDashboardScreen extends StatelessWidget {
                           ),
                         );
                       },
-                    ),
-                    const SizedBox(height: 10),
-                    _buildActionTile(
-                      context: context,
-                      icon: Icons.soup_kitchen_rounded,
-                      title: 'Live Kitchen Display (KDS)',
-                      subtitle: 'Manage food prep timers and courier dispatch for Kofi Boateng',
-                      onTap: () => onNavigateTab(1),
-                    ),
-                    const SizedBox(height: 10),
-                    _buildActionTile(
-                      context: context,
-                      icon: Icons.insights_rounded,
-                      title: 'Sales Performance & Analytics',
-                      subtitle: 'View top selling dishes, customer repeat rate & revenue trends',
-                      onTap: () => onNavigateTab(3),
                     ),
                   ],
                 ),

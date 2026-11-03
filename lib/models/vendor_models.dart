@@ -139,6 +139,72 @@ class CuratedFoodGalleryItem {
   });
 }
 
+/// A vendor's customized dish configured during onboarding or menu editing
+class CustomizedVendorDish {
+  final String id;
+  final String curatedItemId;
+  final String title;
+  final String category;
+  final String imageAsset;
+  final bool isCustomImage;
+  final double price;
+  final String description;
+  final List<DishAddon> selectedAddons;
+  final bool isAvailable;
+
+  const CustomizedVendorDish({
+    required this.id,
+    required this.curatedItemId,
+    required this.title,
+    required this.category,
+    required this.imageAsset,
+    this.isCustomImage = false,
+    required this.price,
+    required this.description,
+    this.selectedAddons = const [],
+    this.isAvailable = true,
+  });
+
+  CustomizedVendorDish copyWith({
+    String? id,
+    String? curatedItemId,
+    String? title,
+    String? category,
+    String? imageAsset,
+    bool? isCustomImage,
+    double? price,
+    String? description,
+    List<DishAddon>? selectedAddons,
+    bool? isAvailable,
+  }) {
+    return CustomizedVendorDish(
+      id: id ?? this.id,
+      curatedItemId: curatedItemId ?? this.curatedItemId,
+      title: title ?? this.title,
+      category: category ?? this.category,
+      imageAsset: imageAsset ?? this.imageAsset,
+      isCustomImage: isCustomImage ?? this.isCustomImage,
+      price: price ?? this.price,
+      description: description ?? this.description,
+      selectedAddons: selectedAddons ?? this.selectedAddons,
+      isAvailable: isAvailable ?? this.isAvailable,
+    );
+  }
+
+  FoodItem toFoodItem() {
+    return FoodItem(
+      id: id,
+      name: title,
+      description: description,
+      price: price,
+      imageAsset: imageAsset,
+      categoryId: category.toLowerCase().replaceAll(' ', '_'),
+      availableAddons: selectedAddons,
+      isAvailable: isAvailable,
+    );
+  }
+}
+
 /// Available addon modifier for vendor setup
 class VendorAddonOption {
   final String id;
