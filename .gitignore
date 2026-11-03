@@ -57,3 +57,7 @@ key.properties
 
 # Secrets
 .env
+
+# Vercel & SDK artifacts
+flutter-sdk/
+.vercel/
