@@ -214,27 +214,30 @@ class PaystackService {
           );
         }
       } else {
-        // Fallback for development/testing if test keys or network is restricted
+        String errMsg = 'Charge failed with status ${response.statusCode}';
+        try {
+          final data = jsonDecode(response.body);
+          if (data['message'] != null) errMsg = data['message'].toString();
+        } catch (_) {}
         if (kDebugMode) {
-          debugPrint('[PaystackService] API returned ${response.statusCode}: ${response.body}. Using simulated MoMo prompt flow.');
+          debugPrint('[PaystackService] API error: ${response.statusCode}: ${response.body}');
         }
         return PaystackChargeResult(
-          isSuccess: true,
-          status: MomoPaymentStatus.promptDispatched,
+          isSuccess: false,
+          status: MomoPaymentStatus.failed,
           reference: reference,
-          displayText: provider.ussdPromptInstruction,
+          errorMessage: errMsg,
         );
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('[PaystackService] Network exception during charge: $e. Using simulated MoMo prompt flow.');
+        debugPrint('[PaystackService] Network exception during charge: $e');
       }
-      // Resilient fallback for offline/demo simulations
       return PaystackChargeResult(
-        isSuccess: true,
-        status: MomoPaymentStatus.promptDispatched,
+        isSuccess: false,
+        status: MomoPaymentStatus.failed,
         reference: reference,
-        displayText: provider.ussdPromptInstruction,
+        errorMessage: 'Unable to connect to Paystack payment gateway. Please check your network and try again.',
       );
     }
   }
@@ -256,10 +259,9 @@ class PaystackService {
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('[PaystackService] Verification check bypassed: $e');
+        debugPrint('[PaystackService] Verification error: $e');
       }
     }
-    // In simulated testing mode, treat as verified after prompt
-    return true;
+    return false;
   }
 }

@@ -39,7 +39,7 @@ class _CartScreenState extends State<CartScreen> {
     super.initState();
     final session = SecurityService().currentSession;
     _momoPhoneController = TextEditingController(
-      text: session?.phone.isNotEmpty == true ? session!.phone : '024 882 1093',
+      text: session?.phone.isNotEmpty == true ? session!.phone : '',
     );
 
     final lastRecipient = CacheService().getLastRecipient();

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../models/food_models.dart';
-import '../data/sample_data.dart';
 
 /// Single item in the shopping cart with customizations and addons
 class CartItem {
@@ -32,25 +31,7 @@ class CartState extends ChangeNotifier {
   static final CartState _instance = CartState._internal();
   factory CartState() => _instance;
 
-  CartState._internal() {
-    // Pre-populate with initial items matching the badge "2" in the reference design
-    if (sampleFoodItems.isNotEmpty) {
-      _items.add(CartItem(
-        foodItem: sampleFoodItems[0],
-        quantity: 1,
-        selectedAddons: [standardGhanaianAddons[0]], // Extra fried fish
-        spiceLevel: 'Regular Pepper',
-      ));
-      if (sampleFoodItems.length > 2) {
-        _items.add(CartItem(
-          foodItem: sampleFoodItems[2],
-          quantity: 1,
-          selectedAddons: [standardGhanaianAddons[3]], // Fried plantains
-          spiceLevel: 'Mild Shito',
-        ));
-      }
-    }
-  }
+  CartState._internal();
 
   final List<CartItem> _items = [];
   String _selectedAddress = 'Post Office Rd, Konongo';
