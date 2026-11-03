@@ -63,7 +63,13 @@ class FirebaseAuthService extends ChangeNotifier {
       case 'network-request-failed':
         return 'No internet connection. Please check your network.';
       case 'operation-not-allowed':
-        return 'This sign-in method is not enabled yet.';
+        return 'Google Sign-In is not enabled in Firebase Console. Please enable it in Authentication -> Sign-in method.';
+      case 'internal-error':
+        return 'Google Sign-In configuration error: check that Google provider is enabled and your domain (or localhost) is in Firebase Authorized Domains.';
+      case 'unauthorized-domain':
+        return 'This domain is not authorized in Firebase Console -> Authentication -> Settings -> Authorized Domains.';
+      case 'popup-blocked':
+        return 'Sign-in popup was blocked by your browser. Please allow popups for this site.';
       case 'account-exists-with-different-credential':
         return 'An account already exists with this email using a different sign-in method.';
       case 'web-context-canceled':
@@ -85,9 +91,24 @@ class FirebaseAuthService extends ChangeNotifier {
       final AuthProvider provider = apple
           ? (AppleAuthProvider()..addScope('email')..addScope('name'))
           : (GoogleAuthProvider()..addScope('email'));
-      final userCred = kIsWeb
-          ? await _auth.signInWithPopup(provider)
-          : await _auth.signInWithProvider(provider);
+      final UserCredential userCred;
+      if (kIsWeb) {
+        try {
+          userCred = await _auth.signInWithPopup(provider);
+        } catch (popupError) {
+          debugPrint('[FirebaseAuthService] Web popup error: $popupError');
+          final code = popupError is FirebaseAuthException ? popupError.code : '';
+          if (code == 'popup-blocked' || code == 'cancelled' || code == 'popup-closed-by-user') {
+            rethrow;
+          }
+          // Attempt redirect if popup fails due to iframe/window context
+          debugPrint('[FirebaseAuthService] Falling back to signInWithRedirect...');
+          await _auth.signInWithRedirect(provider);
+          return await _auth.getRedirectResult();
+        }
+      } else {
+        userCred = await _auth.signInWithProvider(provider);
+      }
       if (userCred.user != null) {
         await _createOrUpdateUserDoc(user: userCred.user!, role: role);
       }
