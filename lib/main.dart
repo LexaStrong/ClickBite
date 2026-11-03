@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'theme/app_theme.dart';
 import 'screens/onboarding_screen.dart';
+import 'screens/splash_screen.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/vendor/vendor_shell_screen.dart';
@@ -63,14 +64,15 @@ class AppRoot extends StatelessWidget {
     final cache = CacheService();
     final session = cache.getCachedSession();
 
-    // 1. If an active session exists, bypass onboarding and auth
+    // 1. If an active session exists, show the animated splash screen with logo first before loading home
     if (session != null && !session.isExpired) {
-      if (session.isVendor) {
-        return cache.isVendorOnboarded()
-            ? const VendorShellScreen()
-            : const VendorOnboardingScreen();
-      }
-      return const HomeScreen();
+      final targetScreen = session.isVendor
+          ? (cache.isVendorOnboarded()
+              ? const VendorShellScreen()
+              : const VendorOnboardingScreen())
+          : const HomeScreen();
+
+      return SplashScreen(nextScreen: targetScreen);
     }
 
     // 2. If user already saw onboarding intro, take them straight to Auth
