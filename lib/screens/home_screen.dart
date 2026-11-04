@@ -53,7 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
       const FoodCategory(
         id: 'all',
         name: 'All Foods',
-        iconAsset: 'assets/icons/rice_dish_icon.png',
+        iconAsset: 'assets/icons/rice_dish_icon.webp',
         isSelected: true,
       ),
       ...sampleCategories.map((c) => c.copyWith(isSelected: false)),

@@ -112,7 +112,7 @@ class _SplashScreenState extends State<SplashScreen>
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 72),
                 child: Image.asset(
-                  'assets/images/clickbite_logo_white.png',
+                  'assets/images/clickbite_logo_white.webp',
                   fit: BoxFit.contain,
                   width: 220,
                 ),

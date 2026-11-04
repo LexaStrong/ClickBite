@@ -153,19 +153,19 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             children: [
               _buildSplashPage(),
               _buildFeaturePage(
-                imagePath: 'assets/images/onboarding_store.png',
+                imagePath: 'assets/images/onboarding_store.webp',
                 title: 'Discover places\naround you',
                 subtitle:
                     'Browse the best restaurants and local food spots in Konongo, all in one place.',
               ),
               _buildFeaturePage(
-                imagePath: 'assets/images/onboarding_burger.png',
+                imagePath: 'assets/images/onboarding_burger.webp',
                 title: 'Discover\ntasty meals',
                 subtitle:
                     'From classic Ghanaian favourites to everyday cravings, find meals you will love.',
               ),
               _buildFeaturePage(
-                imagePath: 'assets/images/onboarding_rider.png',
+                imagePath: 'assets/images/onboarding_rider.webp',
                 title: 'Enjoy fast\ndelivery',
                 subtitle:
                     'Get your food delivered hot and fresh, right to your doorstep in minutes.',
@@ -205,7 +205,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 72),
             child: Image.asset(
-              'assets/images/clickbite_logo_white.png',
+              'assets/images/clickbite_logo_white.webp',
               fit: BoxFit.contain,
               width: 220,
             ),

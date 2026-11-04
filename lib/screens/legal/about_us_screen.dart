@@ -49,7 +49,7 @@ class AboutUsScreen extends StatelessWidget {
                 children: [
                   Center(
                     child: Image.asset(
-                      'assets/images/clickbite_logo.png',
+                      'assets/images/clickbite_logo.webp',
                       height: 72,
                       fit: BoxFit.contain,
                     ),

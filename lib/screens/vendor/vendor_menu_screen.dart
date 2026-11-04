@@ -751,18 +751,18 @@ class _EditDishModalState extends State<_EditDishModal> {
                     physics: const BouncingScrollPhysics(),
                     child: Row(
                       children: [
-                        'assets/images/jollof_rice.png',
-                        'assets/images/fufu_soup.png',
-                        'assets/images/grilled_tilapia.png',
-                        'assets/images/waakye.png',
-                        'assets/images/red_red.png',
-                        'assets/images/ampesi_kontommire.png',
-                        'assets/images/assorted fried_rice.png',
-                        'assets/images/assorted_jollof.png',
-                        'assets/images/kokonte_soup.png',
-                        'assets/images/shawarma.png',
-                        'assets/images/tuo_zaafi.png',
-                        'assets/images/waakye_2.png',
+                        'assets/images/jollof_rice.webp',
+                        'assets/images/fufu_soup.webp',
+                        'assets/images/grilled_tilapia.webp',
+                        'assets/images/waakye.webp',
+                        'assets/images/red_red.webp',
+                        'assets/images/ampesi_kontommire.webp',
+                        'assets/images/assorted fried_rice.webp',
+                        'assets/images/assorted_jollof.webp',
+                        'assets/images/kokonte_soup.webp',
+                        'assets/images/shawarma.webp',
+                        'assets/images/tuo_zaafi.webp',
+                        'assets/images/waakye_2.webp',
                       ].map((asset) {
                         final isSelected = _imageAsset == asset;
                         return Padding(

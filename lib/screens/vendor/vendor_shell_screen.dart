@@ -32,7 +32,7 @@ class _VendorShellScreenState extends State<VendorShellScreen> {
         title: Row(
           children: [
             Image.asset(
-              'assets/images/clickbite_logo.png',
+              'assets/images/clickbite_logo.webp',
               height: 38,
               fit: BoxFit.contain,
               filterQuality: FilterQuality.medium,

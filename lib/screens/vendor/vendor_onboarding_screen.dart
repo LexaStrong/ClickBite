@@ -88,67 +88,67 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
   }
 
   // Eatery Banner Selection
-  String _selectedBannerAsset = 'assets/images/jollof_rice.png';
+  String _selectedBannerAsset = 'assets/images/jollof_rice.webp';
 
   final List<Map<String, String>> _bannerOptions = const [
     {
       'title': 'Firewood Jollof & Spiced Chicken',
-      'asset': 'assets/images/jollof_rice.png',
+      'asset': 'assets/images/jollof_rice.webp',
       'subtitle': 'Warm smoky terracotta tones & rich spice presentation',
     },
     {
       'title': 'Pounded Fufu & Goat Light Soup',
-      'asset': 'assets/images/fufu_soup.png',
+      'asset': 'assets/images/fufu_soup.webp',
       'subtitle': 'Authentic mortar & pestle feast with rich soup broth',
     },
     {
       'title': 'Volta Charcoal Tilapia & Banku',
-      'asset': 'assets/images/grilled_tilapia.png',
+      'asset': 'assets/images/grilled_tilapia.webp',
       'subtitle': 'Fresh river catch with hot shito and green pepper relish',
     },
     {
       'title': 'Royal Waakye & Shito Feast',
-      'asset': 'assets/images/waakye.png',
+      'asset': 'assets/images/waakye.webp',
       'subtitle': 'Brown rice, spaghetti, gari fortor & seasoned wele',
     },
     {
       'title': 'Red Red Stew & Golden Plantains',
-      'asset': 'assets/images/red_red.png',
+      'asset': 'assets/images/red_red.webp',
       'subtitle': 'Caramelized sweet plantains with palm oil bean stew',
     },
     {
       'title': 'Ampesi & Kontommire Stew',
-      'asset': 'assets/images/ampesi_kontommire.png',
+      'asset': 'assets/images/ampesi_kontommire.webp',
       'subtitle': 'Boiled yam and plantain with rich cocoyam leaf stew',
     },
     {
       'title': 'Assorted Fried Rice Platter',
-      'asset': 'assets/images/assorted fried_rice.png',
+      'asset': 'assets/images/assorted fried_rice.webp',
       'subtitle': 'Seasoned rice with mixed vegetables, chicken, and shrimp',
     },
     {
       'title': 'Assorted Jollof Rice Supreme',
-      'asset': 'assets/images/assorted_jollof.png',
+      'asset': 'assets/images/assorted_jollof.webp',
       'subtitle': 'Party-style smoky jollof with assorted meats and kelewele',
     },
     {
       'title': 'Kokonte & Groundnut Soup',
-      'asset': 'assets/images/kokonte_soup.png',
+      'asset': 'assets/images/kokonte_soup.webp',
       'subtitle': 'Smooth dried cassava kokonte with rich groundnut soup',
     },
     {
       'title': 'Grilled Shawarma Wrap',
-      'asset': 'assets/images/shawarma.png',
+      'asset': 'assets/images/shawarma.webp',
       'subtitle': 'Spiced grilled chicken shawarma with garlic sauce and fries',
     },
     {
       'title': 'Tuo Zaafi & Ayoyo Soup',
-      'asset': 'assets/images/tuo_zaafi.png',
+      'asset': 'assets/images/tuo_zaafi.webp',
       'subtitle': 'Northern Ghana tuo zaafi with slimy ayoyo and dawadawa',
     },
     {
       'title': 'Supreme Waakye Festival',
-      'asset': 'assets/images/waakye_2.png',
+      'asset': 'assets/images/waakye_2.webp',
       'subtitle': 'Premium waakye overload with extra wele and fried fish',
     },
   ];
@@ -1179,18 +1179,18 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
                             physics: const BouncingScrollPhysics(),
                             child: Row(
                               children: [
-                                'assets/images/jollof_rice.png',
-                                'assets/images/fufu_soup.png',
-                                'assets/images/grilled_tilapia.png',
-                                'assets/images/waakye.png',
-                                'assets/images/red_red.png',
-                                'assets/images/ampesi_kontommire.png',
-                                'assets/images/assorted fried_rice.png',
-                                'assets/images/assorted_jollof.png',
-                                'assets/images/kokonte_soup.png',
-                                'assets/images/shawarma.png',
-                                'assets/images/tuo_zaafi.png',
-                                'assets/images/waakye_2.png',
+                                'assets/images/jollof_rice.webp',
+                                'assets/images/fufu_soup.webp',
+                                'assets/images/grilled_tilapia.webp',
+                                'assets/images/waakye.webp',
+                                'assets/images/red_red.webp',
+                                'assets/images/ampesi_kontommire.webp',
+                                'assets/images/assorted fried_rice.webp',
+                                'assets/images/assorted_jollof.webp',
+                                'assets/images/kokonte_soup.webp',
+                                'assets/images/shawarma.webp',
+                                'assets/images/tuo_zaafi.webp',
+                                'assets/images/waakye_2.webp',
                               ].map((assetPath) {
                                 final isCurSelected =
                                     config.customImage == assetPath;

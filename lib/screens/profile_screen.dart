@@ -717,7 +717,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 // ClickBite Logo
                 Image.asset(
-                  'assets/images/clickbite_logo.png',
+                  'assets/images/clickbite_logo.webp',
                   height: 38,
                   fit: BoxFit.contain,
                   filterQuality: FilterQuality.medium,

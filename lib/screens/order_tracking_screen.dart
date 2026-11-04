@@ -279,7 +279,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                       borderRadius: BorderRadius.circular(AppRadius.lg),
                     ),
                     child: Image.asset(
-                      'assets/icons/delivery_rider.png',
+                      'assets/icons/delivery_rider.webp',
                       fit: BoxFit.contain,
                     ),
                   ),

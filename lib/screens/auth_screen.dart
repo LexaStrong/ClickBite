@@ -417,7 +417,7 @@ class _AuthScreenState extends State<AuthScreen>
 
                     // Logo
                     Image.asset(
-                      'assets/images/clickbite_logo.png',
+                      'assets/images/clickbite_logo.webp',
                       width: 160,
                       fit: BoxFit.contain,
                     ),

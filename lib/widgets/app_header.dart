@@ -32,7 +32,7 @@ class AppHeader extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Image.asset(
-                  'assets/images/clickbite_logo.png',
+                  'assets/images/clickbite_logo.webp',
                   height: 48,
                   fit: BoxFit.contain,
                   alignment: Alignment.centerLeft,

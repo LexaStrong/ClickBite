@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
 /// Express delivery card proudly featuring the user's provided
-/// courier rider illustration (`assets/icons/delivery_rider.png`).
+/// courier rider illustration (`assets/icons/delivery_rider.webp`).
 class ExpressDeliveryCard extends StatelessWidget {
   final VoidCallback? onTap;
 
@@ -31,7 +31,7 @@ class ExpressDeliveryCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppRadius.lg),
             ),
             child: Image.asset(
-              'assets/icons/delivery_rider.png',
+              'assets/icons/delivery_rider.webp',
               fit: BoxFit.contain,
             ),
           ),
